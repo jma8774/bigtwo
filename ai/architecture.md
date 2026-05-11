@@ -8,12 +8,22 @@ P2 introduces a Node + Socket.IO server that owns game state. The client becomes
 
 ## Repository layout
 
+See ADR-0005 for the frontend/backend split rationale.
+
 ```
 bigtwo/
   ai/                          # project context for AI agents
   references/                  # UI mockups and full spec (read-only reference)
-  src/
-    pages/                     # route-level Vue components
+  frontend/                    # Vue 3 SPA
+    package.json
+    vite.config.ts
+    tsconfig.json
+    tailwind.config.js
+    postcss.config.js
+    index.html
+    public/
+    src/
+      pages/                   # route-level Vue components
       HomePage.vue
       CreateRoomPage.vue
       JoinRoomPage.vue         # P2 mock (not wired to backend yet)
@@ -53,12 +63,14 @@ bigtwo/
       sounds/
         card-play.wav
         your-turn.wav
-    router/
-    style.css
-    main.ts
-    App.vue
-  server/                      # P2 only — Node + Socket.IO (not started)
+      router/
+      style.css
+      main.ts
+      App.vue
+  backend/                     # P2 — Node + Socket.IO (not started)
 ```
+
+All `src/...` paths in this document refer to `frontend/src/...` unless otherwise noted.
 
 ## Major modules
 

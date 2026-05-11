@@ -5,9 +5,19 @@ A clean, friendly online Big Two card game (also known as Chinese Poker / 锄大
 **Phase 1** (current): single-player vs bots, no backend.
 **Phase 2** (later): multiplayer with room codes and WebSockets.
 
+## Repo layout
+
+- `frontend/` — Vue 3 SPA (P1)
+- `backend/` — Node + Socket.IO server (P2, not started)
+- `ai/` — project context, ADRs, tickets
+- `references/` — full spec + UI mockups
+
+See `ai/decisions/ADR-0005-frontend-backend-split.md`.
+
 ## Quick start
 
 ```bash
+cd frontend
 npm install
 npm run dev      # http://localhost:5173
 npm test         # run Vitest
