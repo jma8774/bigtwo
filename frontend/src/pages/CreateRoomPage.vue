@@ -41,8 +41,14 @@ const roundLimitLabel = computed(() =>
   roundLimit.value === null ? 'Unlimited' : `${roundLimit.value}`,
 )
 
-function start() {
-  game.createRoom(
+const creating = ref(false)
+const errorMessage = ref<string | null>(null)
+
+async function start() {
+  if (creating.value) return
+  creating.value = true
+  errorMessage.value = null
+  const ok = await game.createRoomOnline(
     {
       playerCount: playerCount.value,
       fillWithBots: fillWithBots.value,
@@ -54,7 +60,12 @@ function start() {
     },
     nickname.value,
   )
-  router.push({ name: 'lobby' })
+  creating.value = false
+  if (ok) {
+    router.push({ name: 'lobby' })
+  } else {
+    errorMessage.value = 'Could not reach the server. Check your connection and try again.'
+  }
 }
 </script>
 
@@ -277,7 +288,8 @@ function start() {
 
         <button
           type="button"
-          class="mt-8 w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors inline-flex items-center justify-center gap-2"
+          :disabled="creating"
+          class="mt-8 w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
           @click="start"
         >
           <svg
@@ -294,8 +306,9 @@ function start() {
             <path d="M3 10h18" />
             <path d="M12 5v14" />
           </svg>
-          Create Room
+          {{ creating ? 'Creating…' : 'Create Room' }}
         </button>
+        <p v-if="errorMessage" class="text-sm text-rose-500 text-center mt-2">{{ errorMessage }}</p>
       </section>
 
       <aside class="space-y-4">

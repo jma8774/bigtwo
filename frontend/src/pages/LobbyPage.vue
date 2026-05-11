@@ -10,7 +10,8 @@ const game = useGameStore()
 const showRules = ref(false)
 
 onMounted(() => {
-  if (!game.state) router.replace({ name: 'home' })
+  // Allow online sessions to populate state once the first roomUpdated arrives.
+  if (!game.state && !game.mySessionPlayerId) router.replace({ name: 'home' })
 })
 
 const state = computed(() => game.state)

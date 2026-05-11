@@ -1,24 +1,41 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
+import { useGameStore } from '@/stores/gameStore'
 
 const router = useRouter()
+const game = useGameStore()
 const showRules = ref(false)
 
 const nickname = ref('')
-const code = ref<string[]>(['A', 'B', '7', 'K'])
+const code = ref<string[]>(['', '', '', ''])
+const joining = ref(false)
+const errorMessage = ref<string | null>(null)
+
+const codeStr = computed(() => code.value.join('').trim())
+const canJoin = computed(() => codeStr.value.length === 4 && !joining.value)
 
 function setChar(idx: number, val: string) {
   const ch = (val || '').slice(-1).toUpperCase()
   const next = [...code.value]
   next[idx] = ch
   code.value = next
+  errorMessage.value = null
 }
 
-function join() {
-  router.push({ name: 'lobby' })
+async function join() {
+  if (!canJoin.value) return
+  joining.value = true
+  errorMessage.value = null
+  const ok = await game.joinRoomOnline(codeStr.value, nickname.value || 'Guest')
+  joining.value = false
+  if (ok) {
+    router.push({ name: 'lobby' })
+  } else {
+    errorMessage.value = 'Could not join that room. Check the code and try again.'
+  }
 }
 </script>
 
@@ -113,7 +130,8 @@ function join() {
 
           <button
             type="button"
-            class="w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors inline-flex items-center justify-center gap-2"
+            :disabled="!canJoin"
+            class="w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 disabled:bg-slate-300 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center gap-2"
             @click="join"
           >
             <svg
@@ -130,8 +148,9 @@ function join() {
               <polyline points="10 17 15 12 10 7" />
               <line x1="15" y1="12" x2="3" y2="12" />
             </svg>
-            Join Room
+            {{ joining ? 'Joining…' : 'Join Room' }}
           </button>
+          <p v-if="errorMessage" class="text-sm text-rose-500 text-center">{{ errorMessage }}</p>
 
           <div class="flex items-center gap-3">
             <span class="flex-1 h-px bg-slate-200" />

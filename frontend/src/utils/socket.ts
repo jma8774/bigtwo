@@ -23,3 +23,27 @@ export function pingServer(): Promise<{ at: number }> {
     })
   })
 }
+
+// Server payload shape — duplicated here intentionally until TICKET-023's
+// engine-sharing workspace lands. Keep in sync with backend/src/rooms.ts.
+export type RoomPublicState = {
+  roomCode: string
+  status: 'waiting'
+  hostId: string
+  players: Array<{ id: string; nickname: string; isBot: boolean; connected: boolean }>
+  settings: {
+    playerCount: 3 | 4
+    fillWithBots: boolean
+    botDifficulty: 'basic'
+    scoringMode: 'simple'
+    cardValue: number
+    roundLimit: number | null
+    isPublic: boolean
+  }
+}
+
+export type RoomAck =
+  | { ok: true; roomCode: string; playerId: string; seatToken: string }
+  | { ok: false; error: string }
+
+export type RejoinAck = { ok: true } | { ok: false; error: string }

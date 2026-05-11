@@ -2,12 +2,51 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import type { Card } from '@/game/cards'
 import { smartSort, sortByRank, sortBySuit } from '@/game/cards'
-import type { GameState, PlayerId, RoomSettings } from '@/game/gameState'
+import type { GameState, Player, PlayerId, RoomSettings } from '@/game/gameState'
 import { createInitialState, startRound } from '@/game/gameState'
 import { applyPass, applyPlay, canPass, canPlay, type Reason } from '@/game/rules'
 import { calculateRoundDelta } from '@/game/scoring'
 import { chooseBotMove } from '@/game/bot'
 import { playSound } from '@/utils/sound'
+import {
+  getSocket,
+  type RoomAck,
+  type RoomPublicState,
+  type RejoinAck,
+} from '@/utils/socket'
+
+const SESSION_KEY = 'bigTwoSession'
+const BOT_NAMES = ['Alex', 'Riley', 'Ming', 'Sam']
+
+type Session = { roomCode: string; playerId: string; seatToken: string }
+
+function loadSession(): Session | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Session
+    if (parsed.roomCode && parsed.playerId && parsed.seatToken) return parsed
+    return null
+  } catch {
+    return null
+  }
+}
+
+function saveSession(s: Session) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify(s))
+  } catch {
+    // best-effort
+  }
+}
+
+function clearStoredSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch {
+    // best-effort
+  }
+}
 
 const BOT_TURN_DELAY_MS = 700
 
@@ -18,9 +57,15 @@ export const useGameStore = defineStore('game', () => {
   const botThinkingId = ref<PlayerId | null>(null)
   let botTimer: number | null = null
 
-  const humanId = computed<PlayerId | null>(
-    () => state.value?.players.find((p) => !p.isBot)?.id ?? null,
-  )
+  // Online state — set when an online room is created/joined/rejoined.
+  const mySessionPlayerId = ref<PlayerId | null>(null)
+  const isOnlineRoom = ref(false)
+  const isSocketConnected = ref(false)
+
+  const humanId = computed<PlayerId | null>(() => {
+    if (mySessionPlayerId.value) return mySessionPlayerId.value
+    return state.value?.players.find((p) => !p.isBot)?.id ?? null
+  })
   const isHumanTurn = computed(
     () => !!state.value && !!humanId.value && state.value.currentPlayerId === humanId.value,
   )
@@ -61,6 +106,137 @@ export const useGameStore = defineStore('game', () => {
     },
   )
 
+  // --- Online room handling ----------------------------------------------
+
+  function applyRoomUpdated(room: RoomPublicState) {
+    isOnlineRoom.value = true
+    const players: Player[] = room.players.map((p) => ({
+      id: p.id,
+      nickname: p.nickname,
+      isBot: p.isBot,
+      connected: p.connected,
+    }))
+
+    if (!state.value || state.value.roomCode !== room.roomCode) {
+      state.value = {
+        roomCode: room.roomCode,
+        status: 'waiting',
+        roundNumber: 0,
+        turnNumber: 0,
+        players,
+        hands: Object.fromEntries(players.map((p) => [p.id, []])),
+        currentPlayerId: players[0]?.id ?? '',
+        currentPlay: null,
+        lastPlayerToPlay: null,
+        passedPlayerIds: [],
+        scores: Object.fromEntries(players.map((p) => [p.id, 0])),
+        roundDelta: Object.fromEntries(players.map((p) => [p.id, 0])),
+        moveLog: [],
+        playedPile: [],
+        settings: room.settings,
+      }
+      return
+    }
+
+    // Reconcile players + settings; preserve hands/scores for known players.
+    const hands = { ...state.value.hands }
+    const scores = { ...state.value.scores }
+    const delta = { ...state.value.roundDelta }
+    for (const p of players) {
+      if (!hands[p.id]) hands[p.id] = []
+      if (!(p.id in scores)) scores[p.id] = 0
+      if (!(p.id in delta)) delta[p.id] = 0
+    }
+    state.value = {
+      ...state.value,
+      players,
+      hands,
+      scores,
+      roundDelta: delta,
+      settings: room.settings,
+    }
+  }
+
+  const socket = getSocket()
+  isSocketConnected.value = socket.connected
+  socket.on('connect', () => {
+    isSocketConnected.value = true
+    // Best-effort rejoin if a session is stored and we haven't claimed it yet.
+    if (!mySessionPlayerId.value && loadSession()) void rejoinOnline()
+  })
+  socket.on('disconnect', () => {
+    isSocketConnected.value = false
+  })
+  socket.on('roomUpdated', (room: RoomPublicState) => applyRoomUpdated(room))
+
+  function createRoomOnline(settings: RoomSettings, nickname: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      socket.emit('createRoom', { nickname, settings }, (ack: RoomAck) => {
+        if (ack?.ok) {
+          saveSession({
+            roomCode: ack.roomCode,
+            playerId: ack.playerId,
+            seatToken: ack.seatToken,
+          })
+          mySessionPlayerId.value = ack.playerId
+          isOnlineRoom.value = true
+          resolve(true)
+        } else {
+          console.warn('[bigtwo] createRoom failed:', ack?.error)
+          resolve(false)
+        }
+      })
+    })
+  }
+
+  function joinRoomOnline(roomCode: string, nickname: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      socket.emit('joinRoom', { roomCode, nickname }, (ack: RoomAck) => {
+        if (ack?.ok) {
+          saveSession({
+            roomCode: ack.roomCode,
+            playerId: ack.playerId,
+            seatToken: ack.seatToken,
+          })
+          mySessionPlayerId.value = ack.playerId
+          isOnlineRoom.value = true
+          resolve(true)
+        } else {
+          console.warn('[bigtwo] joinRoom failed:', ack?.error)
+          resolve(false)
+        }
+      })
+    })
+  }
+
+  function rejoinOnline(): Promise<boolean> {
+    const session = loadSession()
+    if (!session) return Promise.resolve(false)
+    return new Promise((resolve) => {
+      socket.emit('rejoinRoom', session, (ack: RejoinAck) => {
+        if (ack?.ok) {
+          mySessionPlayerId.value = session.playerId
+          isOnlineRoom.value = true
+          resolve(true)
+        } else {
+          console.warn('[bigtwo] rejoinRoom failed:', ack?.error)
+          clearStoredSession()
+          resolve(false)
+        }
+      })
+    })
+  }
+
+  function leaveRoomOnline() {
+    if (!isOnlineRoom.value) return
+    socket.emit('leaveRoom')
+    clearStoredSession()
+    mySessionPlayerId.value = null
+    isOnlineRoom.value = false
+  }
+
+  // --- Local game lifecycle ----------------------------------------------
+
   function clearBotTimer() {
     if (botTimer !== null) {
       window.clearTimeout(botTimer)
@@ -78,6 +254,30 @@ export const useGameStore = defineStore('game', () => {
 
   function startGame() {
     if (!state.value) return
+    // If we have fewer seats filled than playerCount and bots are enabled,
+    // pad locally before dealing. (Until TICKET-023 lands, the host runs the
+    // game engine on their machine — server-authoritative play comes later.)
+    const target = state.value.settings.playerCount
+    if (state.value.settings.fillWithBots && state.value.players.length < target) {
+      const players: Player[] = [...state.value.players]
+      const hands = { ...state.value.hands }
+      const scores = { ...state.value.scores }
+      const delta = { ...state.value.roundDelta }
+      while (players.length < target) {
+        const i = players.length
+        const bot: Player = {
+          id: `p-bot-${i}`,
+          nickname: BOT_NAMES[i - 1] ?? `Bot ${i}`,
+          isBot: true,
+          connected: true,
+        }
+        players.push(bot)
+        hands[bot.id] = []
+        scores[bot.id] = 0
+        delta[bot.id] = 0
+      }
+      state.value = { ...state.value, players, hands, scores, roundDelta: delta }
+    }
     state.value = startRound(state.value)
     selectedIds.value = new Set()
     errorReason.value = null
@@ -86,6 +286,7 @@ export const useGameStore = defineStore('game', () => {
 
   function endGame() {
     clearBotTimer()
+    if (isOnlineRoom.value) leaveRoomOnline()
     state.value = null
     selectedIds.value = new Set()
     errorReason.value = null
@@ -248,11 +449,18 @@ export const useGameStore = defineStore('game', () => {
     selectedIds,
     errorReason,
     botThinkingId,
+    mySessionPlayerId,
+    isOnlineRoom,
+    isSocketConnected,
     humanId,
     isHumanTurn,
     humanHand,
     atRoundLimit,
     createRoom,
+    createRoomOnline,
+    joinRoomOnline,
+    rejoinOnline,
+    leaveRoomOnline,
     startGame,
     endGame,
     toggleCard,

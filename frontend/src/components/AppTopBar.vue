@@ -2,6 +2,7 @@
 import { useRouter } from 'vue-router'
 import AppLogo from './AppLogo.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useGameStore } from '@/stores/gameStore'
 
 withDefaults(
   defineProps<{
@@ -18,6 +19,7 @@ withDefaults(
 const emit = defineEmits<{ (e: 'rules'): void; (e: 'leave'): void }>()
 const router = useRouter()
 const settings = useSettingsStore()
+const game = useGameStore()
 
 function onLeave() {
   emit('leave')
@@ -36,8 +38,16 @@ function toggleSound() {
     <div class="flex items-center gap-6">
       <RouterLink to="/" class="flex items-center"><AppLogo /></RouterLink>
       <slot name="left">
-        <div v-if="roomCode" class="text-sm text-slate-500">
-          Room <span class="font-mono font-semibold text-slate-900">{{ roomCode }}</span>
+        <div v-if="roomCode" class="text-sm text-slate-500 inline-flex items-center gap-2">
+          <span
+            v-if="game.isOnlineRoom"
+            :title="game.isSocketConnected ? 'Connected' : 'Reconnecting…'"
+            :class="[
+              'w-2 h-2 rounded-full',
+              game.isSocketConnected ? 'bg-emerald-500' : 'bg-rose-500 animate-pulse',
+            ]"
+          />
+          <span>Room <span class="font-mono font-semibold text-slate-900">{{ roomCode }}</span></span>
         </div>
         <div v-if="roundNumber" class="text-sm text-slate-500">
           Round <span class="font-semibold text-slate-900">{{ roundNumber }}</span>
