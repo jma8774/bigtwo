@@ -1,0 +1,6 @@
+{
+  "name": "bigtwo",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": ["frontend", "backend", "shared"]
+}

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { PlayedPileCard } from '@/game/gameState'
+import type { PlayedPileCard } from '@bigtwo/shared'
 import PlayingCard from './PlayingCard.vue'
 
 const props = defineProps<{ cards: PlayedPileCard[] }>()

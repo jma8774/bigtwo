@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Card } from '@/game/cards'
-import { rankValue, suitValue } from '@/game/cards'
+import type { Card } from '@bigtwo/shared'
+import { rankValue, suitValue } from '@bigtwo/shared'
 import PlayingCard from './PlayingCard.vue'
 
 const props = withDefaults(

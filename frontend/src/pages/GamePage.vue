@@ -11,7 +11,7 @@ import ChatPanel from '@/components/ChatPanel.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import RoundSummaryModal from '@/components/RoundSummaryModal.vue'
 import { useGameStore } from '@/stores/gameStore'
-import type { Card } from '@/game/cards'
+import type { Card } from '@bigtwo/shared'
 
 const router = useRouter()
 const game = useGameStore()

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import PlayingCard from './PlayingCard.vue'
-import type { Card } from '@/game/cards'
+import type { Card } from '@bigtwo/shared'
 
 defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()

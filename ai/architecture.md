@@ -8,12 +8,19 @@ P2 introduces a Node + Socket.IO server that owns game state. The client becomes
 
 ## Repository layout
 
-See ADR-0005 for the frontend/backend split rationale.
+See ADR-0005 for the frontend/backend split and ADR-0006 for engine sharing.
 
 ```
 bigtwo/
+  package.json                 # npm workspaces: [frontend, backend, shared]
   ai/                          # project context for AI agents
   references/                  # UI mockups and full spec (read-only reference)
+  shared/                      # @bigtwo/shared — engine (cards, deck, rules, etc.)
+    src/
+      index.ts                 # barrel export — public API
+      cards.ts cards.test.ts
+      deck.ts deck.test.ts
+      handEvaluation.ts rules.ts scoring.ts legalMoves.ts bot.ts gameState.ts
   frontend/                    # Vue 3 SPA
     package.json
     vite.config.ts

@@ -1,12 +1,24 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import type { Card } from '@/game/cards'
-import { smartSort, sortByRank, sortBySuit } from '@/game/cards'
-import type { GameState, Player, PlayerId, RoomSettings } from '@/game/gameState'
-import { createInitialState, startRound } from '@/game/gameState'
-import { applyPass, applyPlay, canPass, canPlay, type Reason } from '@/game/rules'
-import { calculateRoundDelta } from '@/game/scoring'
-import { chooseBotMove } from '@/game/bot'
+import {
+  applyPass,
+  applyPlay,
+  calculateRoundDelta,
+  canPass,
+  canPlay,
+  chooseBotMove,
+  createInitialState,
+  smartSort,
+  sortByRank,
+  sortBySuit,
+  startRound,
+  type Card,
+  type GameState,
+  type Player,
+  type PlayerId,
+  type Reason,
+  type RoomSettings,
+} from '@bigtwo/shared'
 import { playSound } from '@/utils/sound'
 import {
   getSocket,

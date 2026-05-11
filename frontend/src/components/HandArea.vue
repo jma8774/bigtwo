@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onBeforeUnmount, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
-import type { Card } from '@/game/cards'
+import type { Card } from '@bigtwo/shared'
 import PlayingCard from './PlayingCard.vue'
 
 const props = defineProps<{

@@ -1,5 +1,5 @@
 {
-  "name": "bigtwo",
+  "name": "@bigtwo/frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@bigtwo/shared": "*",
     "pinia": "^2.2.6",
     "socket.io-client": "^4.8.3",
     "vue": "^3.5.13",

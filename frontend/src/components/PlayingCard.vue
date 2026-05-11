@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import type { Card } from '@/game/cards'
-import { isRedSuit, suitSymbol } from '@/game/cards'
+import type { Card } from '@bigtwo/shared'
+import { isRedSuit, suitSymbol } from '@bigtwo/shared'
 import { computed } from 'vue'
 
 const props = withDefaults(

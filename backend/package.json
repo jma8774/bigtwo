@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@bigtwo/shared": "*",
     "express": "^4.21.1",
     "socket.io": "^4.8.1"
   },

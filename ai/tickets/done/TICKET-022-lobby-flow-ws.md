@@ -2,7 +2,7 @@
 
 ## Status
 
-Backlog (depends on TICKET-021)
+Done
 
 ## Goal
 
