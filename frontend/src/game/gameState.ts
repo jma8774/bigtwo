@@ -111,6 +111,8 @@ export type GameState = {
   roundNumber: number
   turnNumber: number
   players: Player[]
+  /** Player who can start the game / change settings. Set in online rooms; undefined for local-vs-bots. */
+  hostId?: PlayerId
   hands: Record<PlayerId, Card[]>
   currentPlayerId: PlayerId
   currentPlay: PlayedHand | null

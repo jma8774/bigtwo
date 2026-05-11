@@ -61,6 +61,14 @@ export const useGameStore = defineStore('game', () => {
   const mySessionPlayerId = ref<PlayerId | null>(null)
   const isOnlineRoom = ref(false)
   const isSocketConnected = ref(false)
+  // Tracks restoration of a stored session on app boot or socket reconnect:
+  //   idle    → no stored session, nothing to restore
+  //   pending → stored session detected; waiting on rejoinRoom round-trip
+  //   success → server accepted the rejoin
+  //   failed  → server rejected (session cleared); caller should redirect
+  const sessionRestoreState = ref<'idle' | 'pending' | 'success' | 'failed'>(
+    loadSession() ? 'pending' : 'idle',
+  )
 
   const humanId = computed<PlayerId | null>(() => {
     if (mySessionPlayerId.value) return mySessionPlayerId.value
@@ -124,6 +132,7 @@ export const useGameStore = defineStore('game', () => {
         roundNumber: 0,
         turnNumber: 0,
         players,
+        hostId: room.hostId,
         hands: Object.fromEntries(players.map((p) => [p.id, []])),
         currentPlayerId: players[0]?.id ?? '',
         currentPlay: null,
@@ -150,6 +159,7 @@ export const useGameStore = defineStore('game', () => {
     state.value = {
       ...state.value,
       players,
+      hostId: room.hostId,
       hands,
       scores,
       roundDelta: delta,
@@ -162,7 +172,14 @@ export const useGameStore = defineStore('game', () => {
   socket.on('connect', () => {
     isSocketConnected.value = true
     // Best-effort rejoin if a session is stored and we haven't claimed it yet.
-    if (!mySessionPlayerId.value && loadSession()) void rejoinOnline()
+    if (!mySessionPlayerId.value && loadSession()) {
+      if (sessionRestoreState.value !== 'pending') sessionRestoreState.value = 'pending'
+      void rejoinOnline().then((ok) => {
+        sessionRestoreState.value = ok ? 'success' : 'failed'
+      })
+    } else if (sessionRestoreState.value === 'pending' && !loadSession()) {
+      sessionRestoreState.value = 'idle'
+    }
   })
   socket.on('disconnect', () => {
     isSocketConnected.value = false
@@ -452,6 +469,7 @@ export const useGameStore = defineStore('game', () => {
     mySessionPlayerId,
     isOnlineRoom,
     isSocketConnected,
+    sessionRestoreState,
     humanId,
     isHumanTurn,
     humanHand,

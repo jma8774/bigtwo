@@ -14,6 +14,12 @@ const code = ref<string[]>(['', '', '', ''])
 const joining = ref(false)
 const errorMessage = ref<string | null>(null)
 
+const inputs = ref<HTMLInputElement[]>([])
+
+function setInputRef(el: Element | null, idx: number) {
+  if (el instanceof HTMLInputElement) inputs.value[idx] = el
+}
+
 const codeStr = computed(() => code.value.join('').trim())
 const canJoin = computed(() => codeStr.value.length === 4 && !joining.value)
 
@@ -23,6 +29,42 @@ function setChar(idx: number, val: string) {
   next[idx] = ch
   code.value = next
   errorMessage.value = null
+  if (ch && idx < 3) {
+    const nextInput = inputs.value[idx + 1]
+    nextInput?.focus()
+    nextInput?.select()
+  }
+}
+
+function onKeyDown(idx: number, e: KeyboardEvent) {
+  if (e.key === 'Backspace' && !code.value[idx] && idx > 0) {
+    inputs.value[idx - 1]?.focus()
+  } else if (e.key === 'ArrowLeft' && idx > 0) {
+    inputs.value[idx - 1]?.focus()
+  } else if (e.key === 'ArrowRight' && idx < 3) {
+    inputs.value[idx + 1]?.focus()
+  } else if (e.key === 'Enter' && canJoin.value) {
+    void join()
+  }
+}
+
+function onPaste(idx: number, e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') ?? ''
+  const cleaned = text.replace(/[^A-Z0-9]/gi, '').toUpperCase()
+  if (!cleaned) return
+  e.preventDefault()
+  const next = [...code.value]
+  let i = idx
+  for (const ch of cleaned) {
+    if (i > 3) break
+    next[i] = ch
+    i++
+  }
+  code.value = next
+  errorMessage.value = null
+  const last = Math.min(idx + cleaned.length, 3)
+  inputs.value[last]?.focus()
+  inputs.value[last]?.select()
 }
 
 async function join() {
@@ -118,8 +160,13 @@ async function join() {
                 <input
                   v-for="(_, i) in 4"
                   :key="i"
+                  :ref="(el) => setInputRef(el as Element | null, i)"
                   :value="code[i]"
                   @input="setChar(i, ($event.target as HTMLInputElement).value)"
+                  @keydown="onKeyDown(i, $event)"
+                  @paste="onPaste(i, $event)"
+                  inputmode="text"
+                  autocapitalize="characters"
                   maxlength="1"
                   class="w-11 h-12 text-center text-lg font-mono font-semibold rounded-lg border border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none uppercase"
                 />

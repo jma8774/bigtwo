@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
@@ -9,10 +9,25 @@ const router = useRouter()
 const game = useGameStore()
 const showRules = ref(false)
 
+function maybeRedirectHome() {
+  // Stay if we already have state or an active online session.
+  if (game.state || game.mySessionPlayerId) return
+  // Wait if a stored session is still being restored.
+  if (game.sessionRestoreState === 'pending') return
+  router.replace({ name: 'home' })
+}
+
 onMounted(() => {
-  // Allow online sessions to populate state once the first roomUpdated arrives.
-  if (!game.state && !game.mySessionPlayerId) router.replace({ name: 'home' })
+  maybeRedirectHome()
 })
+
+// If the session restore resolves while we're sitting here, react.
+watch(
+  () => game.sessionRestoreState,
+  (s) => {
+    if (s === 'failed' || s === 'idle') maybeRedirectHome()
+  },
+)
 
 const state = computed(() => game.state)
 const roomCode = computed(() => state.value?.roomCode ?? '')
@@ -30,14 +45,16 @@ const colorClass: Record<AvatarColor, string> = {
 
 const players = computed(() => {
   if (!state.value) return []
+  const hostId = state.value.hostId
   return state.value.players.map((p, i) => ({
     id: p.id,
     initials: p.nickname.slice(0, 1).toUpperCase(),
     name: p.nickname,
     color: AVATAR_COLORS[i % AVATAR_COLORS.length],
     isBot: p.isBot,
-    isHost: !p.isBot && i === 0,
-    ready: true,
+    isHost: hostId ? p.id === hostId : !p.isBot && i === 0,
+    connected: p.connected,
+    ready: p.connected,
   }))
 })
 
@@ -195,18 +212,28 @@ function leave() {
               <li
                 v-for="p in players"
                 :key="p.id"
-                class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2.5"
+                :class="[
+                  'flex items-center justify-between rounded-xl border px-3 py-2.5',
+                  p.connected
+                    ? 'border-slate-200'
+                    : 'border-rose-200 bg-rose-50/40',
+                ]"
               >
                 <div class="flex items-center gap-3">
                   <span
                     :class="[
                       'w-9 h-9 rounded-full grid place-items-center font-semibold',
-                      colorClass[p.color],
+                      p.connected ? colorClass[p.color] : 'bg-slate-100 text-slate-400',
                     ]"
                     >{{ p.initials }}</span
                   >
                   <div>
-                    <p class="font-medium text-slate-900 leading-tight">
+                    <p
+                      :class="[
+                        'font-medium leading-tight',
+                        p.connected ? 'text-slate-900' : 'text-slate-400',
+                      ]"
+                    >
                       {{ p.name }}
                       <span v-if="p.isBot" class="text-xs text-slate-400 font-normal">(bot)</span>
                     </p>
@@ -214,10 +241,35 @@ function leave() {
                   </div>
                 </div>
                 <span
+                  v-if="p.connected"
                   class="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 bg-emerald-50 text-emerald-700"
                 >
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                   Ready
+                </span>
+                <span
+                  v-else
+                  class="inline-flex items-center gap-1.5 text-xs font-medium rounded-full px-2.5 py-1 bg-rose-50 text-rose-600"
+                >
+                  <svg
+                    class="w-3 h-3"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                    <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                    <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                    <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+                    <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                    <line x1="12" y1="20" x2="12.01" y2="20" />
+                  </svg>
+                  Disconnected
                 </span>
               </li>
             </ul>
