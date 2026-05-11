@@ -1,8 +1,14 @@
-# TICKET-007: Multiplayer foundation (P2 Milestone 5)
+# TICKET-007: Multiplayer foundation (P2 Milestone 5) — umbrella
 
 ## Status
 
-Backlog
+Backlog (umbrella). Concrete sub-tickets:
+- **TICKET-021** — Backend scaffold (Express + Socket.IO, in-memory rooms, healthz, no game logic)
+- **TICKET-022** — Lobby flow over WS (`createRoom`, `joinRoom`, `rejoinRoom`, `roomUpdated`, seat tokens, public/private)
+- **TICKET-023** — Gameplay over WS (`startGame`, `playCards`, `passTurn`, `gameUpdated`, `invalidMove`, `roundEnded`) — engine sharing strategy decided here.
+- **TICKET-024** — Ready check between rounds (`readyForNextRound`, `playerReady`, `readyCheckSatisfied`)
+- **TICKET-008** — Disconnect / reconnect reliability (already filed)
+- **TICKET-013** — Public lobby browser (already filed; depends on the above)
 
 ## Goal
 
