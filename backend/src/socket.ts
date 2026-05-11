@@ -10,6 +10,13 @@ import {
   type PublicRoomSummary,
   type RoomSettings,
 } from './rooms'
+import {
+  playCardsForPlayer,
+  passTurnForPlayer,
+  readyForNextRound,
+  startGameForRoom,
+  type GameActionResult,
+} from './game'
 
 const PUBLIC_LOBBY_CHANNEL = 'public-lobby-list'
 
@@ -134,6 +141,69 @@ export function registerHandlers(io: Server): void {
       emitPublicRoomsChanged(io)
       console.log(`[room] ${playerId} left ${roomCode}`)
     })
+
+    socket.on(
+      'startGame',
+      (_payload: { roomCode: string }, ack?: (r: GameActionResult) => void) => {
+        const data = socket.data as SocketData
+        if (!data.roomCode || !data.playerId) {
+          ack?.({ ok: false, error: 'NOT_IN_ROOM' })
+          return
+        }
+        const result = startGameForRoom(io, data.roomCode, data.playerId)
+        ack?.(result)
+        emitPublicRoomsChanged(io)
+      },
+    )
+
+    socket.on(
+      'playCards',
+      (
+        payload: { roomCode: string; cardIds: string[] },
+        ack?: (r: GameActionResult) => void,
+      ) => {
+        const data = socket.data as SocketData
+        if (!data.roomCode || !data.playerId) {
+          ack?.({ ok: false, error: 'NOT_IN_ROOM' })
+          return
+        }
+        const result = playCardsForPlayer(
+          io,
+          data.roomCode,
+          data.playerId,
+          payload.cardIds,
+        )
+        if (!result.ok) socket.emit('invalidMove', { reason: result.error })
+        ack?.(result)
+      },
+    )
+
+    socket.on(
+      'passTurn',
+      (_payload: { roomCode: string }, ack?: (r: GameActionResult) => void) => {
+        const data = socket.data as SocketData
+        if (!data.roomCode || !data.playerId) {
+          ack?.({ ok: false, error: 'NOT_IN_ROOM' })
+          return
+        }
+        const result = passTurnForPlayer(io, data.roomCode, data.playerId)
+        if (!result.ok) socket.emit('invalidMove', { reason: result.error })
+        ack?.(result)
+      },
+    )
+
+    socket.on(
+      'readyForNextRound',
+      (_payload: { roomCode: string }, ack?: (r: GameActionResult) => void) => {
+        const data = socket.data as SocketData
+        if (!data.roomCode || !data.playerId) {
+          ack?.({ ok: false, error: 'NOT_IN_ROOM' })
+          return
+        }
+        const result = readyForNextRound(io, data.roomCode, data.playerId)
+        ack?.(result)
+      },
+    )
 
     socket.on(
       'subscribePublicRooms',

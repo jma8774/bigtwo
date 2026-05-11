@@ -1,17 +1,9 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import {
-  applyPass,
-  applyPlay,
-  calculateRoundDelta,
-  canPass,
-  canPlay,
-  chooseBotMove,
-  createInitialState,
   smartSort,
   sortByRank,
   sortBySuit,
-  startRound,
   type Card,
   type GameState,
   type Player,
@@ -22,13 +14,12 @@ import {
 import { playSound } from '@/utils/sound'
 import {
   getSocket,
+  type RejoinAck,
   type RoomAck,
   type RoomPublicState,
-  type RejoinAck,
 } from '@/utils/socket'
 
 const SESSION_KEY = 'bigTwoSession'
-const BOT_NAMES = ['Alex', 'Riley', 'Ming', 'Sam']
 
 type Session = { roomCode: string; playerId: string; seatToken: string }
 
@@ -60,24 +51,15 @@ function clearStoredSession() {
   }
 }
 
-const BOT_TURN_DELAY_MS = 700
-
 export const useGameStore = defineStore('game', () => {
   const state = ref<GameState | null>(null)
   const selectedIds = ref<Set<string>>(new Set())
   const errorReason = ref<Reason | null>(null)
-  const botThinkingId = ref<PlayerId | null>(null)
-  let botTimer: number | null = null
 
-  // Online state — set when an online room is created/joined/rejoined.
+  // Online session tracking
   const mySessionPlayerId = ref<PlayerId | null>(null)
   const isOnlineRoom = ref(false)
   const isSocketConnected = ref(false)
-  // Tracks restoration of a stored session on app boot or socket reconnect:
-  //   idle    → no stored session, nothing to restore
-  //   pending → stored session detected; waiting on rejoinRoom round-trip
-  //   success → server accepted the rejoin
-  //   failed  → server rejected (session cleared); caller should redirect
   const sessionRestoreState = ref<'idle' | 'pending' | 'success' | 'failed'>(
     loadSession() ? 'pending' : 'idle',
   )
@@ -97,14 +79,21 @@ export const useGameStore = defineStore('game', () => {
     if (!state.value || state.value.settings.roundLimit === null) return false
     return state.value.roundNumber >= state.value.settings.roundLimit
   })
+  /** During an active turn, if the current player is a bot, the server is
+   *  scheduling its move (~700ms). UI surfaces this as a "thinking" indicator. */
+  const botThinkingId = computed<PlayerId | null>(() => {
+    if (!state.value || state.value.status !== 'playing') return null
+    const current = state.value.players.find((p) => p.id === state.value?.currentPlayerId)
+    return current?.isBot ? current.id : null
+  })
 
-  // Sound triggers
+  // --- Sound triggers ----------------------------------------------------
+
   watch(
     () => state.value?.moveLog.length ?? 0,
     (next, prev) => {
       if (next > (prev ?? 0)) {
         const newest = state.value?.moveLog[next - 1]
-        // Skip the cardPlay sound if this play ended the round.
         if (newest?.type === 'play' && state.value?.status === 'playing') {
           playSound('cardPlay')
         }
@@ -126,7 +115,7 @@ export const useGameStore = defineStore('game', () => {
     },
   )
 
-  // --- Online room handling ----------------------------------------------
+  // --- Online room lifecycle ---------------------------------------------
 
   function applyRoomUpdated(room: RoomPublicState) {
     isOnlineRoom.value = true
@@ -159,23 +148,37 @@ export const useGameStore = defineStore('game', () => {
       return
     }
 
-    // Reconcile players + settings; preserve hands/scores for known players.
-    const hands = { ...state.value.hands }
-    const scores = { ...state.value.scores }
-    const delta = { ...state.value.roundDelta }
-    for (const p of players) {
-      if (!hands[p.id]) hands[p.id] = []
-      if (!(p.id in scores)) scores[p.id] = 0
-      if (!(p.id in delta)) delta[p.id] = 0
-    }
-    state.value = {
-      ...state.value,
-      players,
-      hostId: room.hostId,
-      hands,
-      scores,
-      roundDelta: delta,
-      settings: room.settings,
+    // While the game is live, the canonical state comes from gameUpdated, not
+    // roomUpdated. Reconcile only metadata that isn't part of GameState.
+    if (state.value.status === 'waiting') {
+      const hands = { ...state.value.hands }
+      const scores = { ...state.value.scores }
+      const delta = { ...state.value.roundDelta }
+      for (const p of players) {
+        if (!hands[p.id]) hands[p.id] = []
+        if (!(p.id in scores)) scores[p.id] = 0
+        if (!(p.id in delta)) delta[p.id] = 0
+      }
+      state.value = {
+        ...state.value,
+        players,
+        hostId: room.hostId,
+        hands,
+        scores,
+        roundDelta: delta,
+        settings: room.settings,
+      }
+    } else {
+      // Mid-game: only refresh roster fields that don't conflict with engine state.
+      state.value = {
+        ...state.value,
+        hostId: room.hostId,
+        players: state.value.players.map((existing) => {
+          const fresh = players.find((p) => p.id === existing.id)
+          return fresh ? { ...existing, connected: fresh.connected, nickname: fresh.nickname } : existing
+        }),
+        settings: room.settings,
+      }
     }
   }
 
@@ -183,7 +186,6 @@ export const useGameStore = defineStore('game', () => {
   isSocketConnected.value = socket.connected
   socket.on('connect', () => {
     isSocketConnected.value = true
-    // Best-effort rejoin if a session is stored and we haven't claimed it yet.
     if (!mySessionPlayerId.value && loadSession()) {
       if (sessionRestoreState.value !== 'pending') sessionRestoreState.value = 'pending'
       void rejoinOnline().then((ok) => {
@@ -197,6 +199,19 @@ export const useGameStore = defineStore('game', () => {
     isSocketConnected.value = false
   })
   socket.on('roomUpdated', (room: RoomPublicState) => applyRoomUpdated(room))
+  socket.on('gameUpdated', (next: GameState) => {
+    state.value = next
+    // Drop selections that reference cards we no longer have.
+    if (humanId.value) {
+      const ownIds = new Set((next.hands[humanId.value] ?? []).map((c) => c.id))
+      const trimmed = new Set<string>()
+      for (const id of selectedIds.value) if (ownIds.has(id)) trimmed.add(id)
+      if (trimmed.size !== selectedIds.value.size) selectedIds.value = trimmed
+    }
+  })
+  socket.on('invalidMove', ({ reason }: { reason: string }) => {
+    errorReason.value = reason as Reason
+  })
 
   function createRoomOnline(settings: RoomSettings, nickname: string): Promise<boolean> {
     return new Promise((resolve) => {
@@ -264,62 +279,59 @@ export const useGameStore = defineStore('game', () => {
     isOnlineRoom.value = false
   }
 
-  // --- Local game lifecycle ----------------------------------------------
-
-  function clearBotTimer() {
-    if (botTimer !== null) {
-      window.clearTimeout(botTimer)
-      botTimer = null
-    }
-    botThinkingId.value = null
-  }
-
-  function createRoom(settings: RoomSettings, nickname: string) {
-    clearBotTimer()
-    state.value = createInitialState(settings, nickname)
-    selectedIds.value = new Set()
-    errorReason.value = null
-  }
+  // --- Gameplay intents (all server-authoritative) -----------------------
 
   function startGame() {
     if (!state.value) return
-    // If we have fewer seats filled than playerCount and bots are enabled,
-    // pad locally before dealing. (Until TICKET-023 lands, the host runs the
-    // game engine on their machine — server-authoritative play comes later.)
-    const target = state.value.settings.playerCount
-    if (state.value.settings.fillWithBots && state.value.players.length < target) {
-      const players: Player[] = [...state.value.players]
-      const hands = { ...state.value.hands }
-      const scores = { ...state.value.scores }
-      const delta = { ...state.value.roundDelta }
-      while (players.length < target) {
-        const i = players.length
-        const bot: Player = {
-          id: `p-bot-${i}`,
-          nickname: BOT_NAMES[i - 1] ?? `Bot ${i}`,
-          isBot: true,
-          connected: true,
-        }
-        players.push(bot)
-        hands[bot.id] = []
-        scores[bot.id] = 0
-        delta[bot.id] = 0
-      }
-      state.value = { ...state.value, players, hands, scores, roundDelta: delta }
+    socket.emit('startGame', { roomCode: state.value.roomCode }, (ack: { ok: boolean; error?: string }) => {
+      if (!ack?.ok) console.warn('[bigtwo] startGame failed:', ack?.error)
+    })
+  }
+
+  function playSelected() {
+    if (!state.value) return
+    const cardIds = Array.from(selectedIds.value)
+    if (cardIds.length === 0) {
+      errorReason.value = 'EMPTY_SELECTION'
+      return
     }
-    state.value = startRound(state.value)
-    selectedIds.value = new Set()
-    errorReason.value = null
-    scheduleBotIfNeeded()
+    socket.emit(
+      'playCards',
+      { roomCode: state.value.roomCode, cardIds },
+      (ack: { ok: boolean; error?: string }) => {
+        if (ack?.ok) {
+          selectedIds.value = new Set()
+          errorReason.value = null
+        }
+      },
+    )
+  }
+
+  function passTurn() {
+    if (!state.value) return
+    socket.emit(
+      'passTurn',
+      { roomCode: state.value.roomCode },
+      (ack: { ok: boolean; error?: string }) => {
+        if (ack?.ok) errorReason.value = null
+      },
+    )
+  }
+
+  function nextRound() {
+    if (!state.value) return
+    if (state.value.status === 'matchOver') return
+    socket.emit('readyForNextRound', { roomCode: state.value.roomCode })
   }
 
   function endGame() {
-    clearBotTimer()
     if (isOnlineRoom.value) leaveRoomOnline()
     state.value = null
     selectedIds.value = new Set()
     errorReason.value = null
   }
+
+  // --- Local UI state (selection, hand sort) -----------------------------
 
   function toggleCard(card: Card) {
     if (!isHumanTurn.value) return
@@ -335,6 +347,9 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function reorderHand(newOrder: Card[]) {
+    // Hand order is a purely local display preference. Never sent to the server;
+    // the next gameUpdated may re-establish a server-side order, which the user
+    // can re-sort if desired.
     if (!state.value || !humanId.value) return
     state.value = {
       ...state.value,
@@ -352,127 +367,6 @@ export const useGameStore = defineStore('game', () => {
     }
   }
 
-  function playSelected() {
-    if (!state.value || !humanId.value) return
-    const hand = state.value.hands[humanId.value]
-    const cards = hand.filter((c) => selectedIds.value.has(c.id))
-
-    const result = canPlay(state.value, humanId.value, cards)
-    if (!result.ok) {
-      errorReason.value = result.reason
-      return
-    }
-    state.value = applyPlay(state.value, humanId.value, cards)
-    selectedIds.value = new Set()
-    errorReason.value = null
-
-    if (state.value.status === 'roundOver') {
-      finalizeRound()
-      return
-    }
-    scheduleBotIfNeeded()
-  }
-
-  function passTurn() {
-    if (!state.value || !humanId.value) return
-    const result = canPass(state.value, humanId.value)
-    if (!result.ok) {
-      errorReason.value = result.reason
-      return
-    }
-    state.value = applyPass(state.value, humanId.value)
-    errorReason.value = null
-    scheduleBotIfNeeded()
-  }
-
-  function finalizeRound() {
-    if (!state.value) return
-    const delta = calculateRoundDelta(state.value)
-    const scores = { ...state.value.scores }
-    for (const [pid, d] of Object.entries(delta)) {
-      scores[pid] = (scores[pid] ?? 0) + d
-    }
-    const willEnd =
-      state.value.settings.roundLimit !== null &&
-      state.value.roundNumber >= state.value.settings.roundLimit
-    state.value = {
-      ...state.value,
-      scores,
-      roundDelta: delta,
-      status: willEnd ? 'matchOver' : 'roundOver',
-    }
-  }
-
-  function nextRound() {
-    if (!state.value) return
-    if (state.value.status === 'matchOver') return
-    state.value = startRound(state.value)
-    selectedIds.value = new Set()
-    scheduleBotIfNeeded()
-  }
-
-  function playAgain() {
-    if (!state.value) return
-    const settings = state.value.settings
-    const nickname = state.value.players.find((p) => !p.isBot)?.nickname ?? 'You'
-    createRoom(settings, nickname)
-    startGame()
-  }
-
-  function scheduleBotIfNeeded() {
-    clearBotTimer()
-    if (!state.value || state.value.status !== 'playing') return
-    const current = state.value.players.find((p) => p.id === state.value?.currentPlayerId)
-    if (!current?.isBot) return
-
-    const botId = current.id
-    botThinkingId.value = botId
-    botTimer = window.setTimeout(() => {
-      botTimer = null
-      botThinkingId.value = null
-      if (!state.value || state.value.status !== 'playing') return
-      if (state.value.currentPlayerId !== botId) return
-
-      const move = chooseBotMove(state.value, botId)
-      if (move.type === 'play') {
-        const result = canPlay(state.value, botId, move.cards)
-        if (result.ok) {
-          state.value = applyPlay(state.value, botId, move.cards)
-        } else {
-          // Defensive: fall back to pass if our own bot proposed something illegal.
-          state.value = applyPass(state.value, botId)
-        }
-      } else {
-        const passResult = canPass(state.value, botId)
-        if (passResult.ok) {
-          state.value = applyPass(state.value, botId)
-        } else {
-          // Bot is controller and can't pass — force a lead play.
-          const fallback = chooseBotMove(
-            { ...state.value, currentPlay: null },
-            botId,
-          )
-          if (fallback.type === 'play') {
-            state.value = applyPlay(state.value, botId, fallback.cards)
-          }
-        }
-      }
-
-      if (state.value.status === 'roundOver' || state.value.status === 'playing') {
-        if (state.value.status === 'roundOver') {
-          // Hand emptied; rely on the playPath, but state may have status='roundOver' set by applyPlay.
-        }
-      }
-
-      if (state.value.status === 'playing') {
-        scheduleBotIfNeeded()
-      } else if (state.value.status === 'roundOver') {
-        // applyPlay set roundOver. Compute scores.
-        finalizeRound()
-      }
-    }, BOT_TURN_DELAY_MS)
-  }
-
   return {
     state,
     selectedIds,
@@ -486,7 +380,6 @@ export const useGameStore = defineStore('game', () => {
     isHumanTurn,
     humanHand,
     atRoundLimit,
-    createRoom,
     createRoomOnline,
     joinRoomOnline,
     rejoinOnline,
@@ -500,6 +393,5 @@ export const useGameStore = defineStore('game', () => {
     playSelected,
     passTurn,
     nextRound,
-    playAgain,
   }
 })

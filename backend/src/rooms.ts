@@ -1,4 +1,5 @@
 import { randomBytes, randomInt } from 'node:crypto'
+import type { GameState } from '@bigtwo/shared'
 
 export type PlayerId = string
 
@@ -22,22 +23,24 @@ export type RoomPlayer = {
   seatToken: string
 }
 
-export type RoomStatus = 'waiting' // expanded in TICKET-023
-
 export type Room = {
   code: string
-  status: RoomStatus
   hostId: PlayerId
   players: RoomPlayer[]
   settings: RoomSettings
   createdAt: number
+  /** Engine state once the game starts. null while in the lobby. */
+  gameState: GameState | null
+  /** Server-side bot turn scheduler handle. */
+  botTimer: ReturnType<typeof setTimeout> | null
 }
 
 export type PublicPlayer = Pick<RoomPlayer, 'id' | 'nickname' | 'isBot' | 'connected'>
 
 export type RoomPublicState = {
   roomCode: string
-  status: RoomStatus
+  /** Mirrors gameState.status when a game has started; 'waiting' before. */
+  status: 'waiting' | 'playing' | 'roundOver' | 'matchOver'
   hostId: PlayerId
   players: PublicPlayer[]
   settings: RoomSettings
@@ -83,11 +86,12 @@ export function createRoom(
   const player = makePlayer(nickname)
   const room: Room = {
     code: newCode(),
-    status: 'waiting',
     hostId: player.id,
     players: [player],
     settings,
     createdAt: Date.now(),
+    gameState: null,
+    botTimer: null,
   }
   rooms.set(room.code, room)
   return { room, player }
@@ -99,7 +103,9 @@ export function joinRoom(
 ): { room: Room; player: RoomPlayer } | { error: string } {
   const room = rooms.get(code)
   if (!room) return { error: 'ROOM_NOT_FOUND' }
-  if (room.status !== 'waiting') return { error: 'GAME_ALREADY_STARTED' }
+  if (room.gameState && room.gameState.status !== 'waiting') {
+    return { error: 'GAME_ALREADY_STARTED' }
+  }
   if (room.players.length >= room.settings.playerCount) return { error: 'ROOM_FULL' }
   const player = makePlayer(nickname)
   room.players.push(player)
@@ -172,7 +178,7 @@ export function listPublicRooms(): PublicRoomSummary[] {
       playerCount: room.settings.playerCount,
       seatsTaken: room.players.length,
       seatsAvailable: Math.max(0, room.settings.playerCount - room.players.length),
-      inProgress: room.status !== 'waiting',
+      inProgress: !!room.gameState && room.gameState.status !== 'waiting',
       createdAt: room.createdAt,
     })
   }
@@ -183,7 +189,7 @@ export function listPublicRooms(): PublicRoomSummary[] {
 export function publicState(room: Room): RoomPublicState {
   return {
     roomCode: room.code,
-    status: room.status,
+    status: room.gameState?.status ?? 'waiting',
     hostId: room.hostId,
     players: room.players.map((p) => ({
       id: p.id,

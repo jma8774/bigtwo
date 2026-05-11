@@ -114,6 +114,12 @@ export type GameState = {
   /** Player who can start the game / change settings. Set in online rooms; undefined for local-vs-bots. */
   hostId?: PlayerId
   hands: Record<PlayerId, Card[]>
+  /**
+   * P2 server-authoritative payloads strip other players' hands but preserve
+   * counts here. Clients should prefer `handCounts?.[id]` over `hands[id]?.length`
+   * for opponent card counts. Undefined in local-only states.
+   */
+  handCounts?: Record<PlayerId, number>
   currentPlayerId: PlayerId
   currentPlay: PlayedHand | null
   lastPlayerToPlay: PlayerId | null
@@ -125,32 +131,18 @@ export type GameState = {
   settings: RoomSettings
 }
 
-const BOT_NAMES = ['Alex', 'Riley', 'Ming', 'Sam']
-
-function generateRoomCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
-  let code = ''
-  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)]
-  return code
-}
-
+/**
+ * Build a fresh GameState for a known room + player list. The caller (server
+ * or local store) supplies players in seat order; this function just sets up
+ * empty hands/scores and returns the state in 'waiting' status. Call startRound
+ * to deal and begin a round.
+ */
 export function createInitialState(
+  roomCode: string,
   settings: RoomSettings,
-  humanNickname: string,
+  players: Player[],
+  hostId?: PlayerId,
 ): GameState {
-  const players: Player[] = [
-    { id: 'p-human', nickname: humanNickname || 'You', isBot: false, connected: true },
-  ]
-  while (players.length < settings.playerCount) {
-    const name = BOT_NAMES[players.length - 1] ?? `Bot ${players.length}`
-    players.push({
-      id: `p-bot-${players.length}`,
-      nickname: name,
-      isBot: true,
-      connected: true,
-    })
-  }
-
   const hands: Record<PlayerId, Card[]> = {}
   const scores: Record<PlayerId, number> = {}
   const roundDelta: Record<PlayerId, number> = {}
@@ -161,13 +153,14 @@ export function createInitialState(
   }
 
   return {
-    roomCode: generateRoomCode(),
+    roomCode,
     status: 'waiting',
     roundNumber: 0,
     turnNumber: 0,
     players,
+    hostId,
     hands,
-    currentPlayerId: players[0].id,
+    currentPlayerId: players[0]?.id ?? '',
     currentPlay: null,
     lastPlayerToPlay: null,
     passedPlayerIds: [],

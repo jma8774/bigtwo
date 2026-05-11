@@ -33,7 +33,8 @@ const opponents = computed(() => {
     .filter((p) => p.id !== humanId.value)
     .map((p) => ({
       name: p.nickname,
-      cardCount: state.value!.hands[p.id]?.length ?? 0,
+      cardCount:
+        state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0,
       score: state.value!.scores[p.id] ?? 0,
       status:
         state.value!.currentPlayerId === p.id && state.value!.status === 'playing'
@@ -146,8 +147,7 @@ function onReady() {
 
 function proceed() {
   clearReadyTimers()
-  if (state.value?.status === 'matchOver') game.playAgain()
-  else game.nextRound()
+  game.nextRound()
 }
 
 watch(
@@ -188,7 +188,10 @@ const summary = computed(() => {
 
   let winner = state.value.players[0]
   if (!isFinal) {
-    const w = state.value.players.find((p) => state.value!.hands[p.id].length === 0)
+    const w = state.value.players.find(
+      (p) =>
+        (state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0) === 0,
+    )
     if (w) winner = w
   } else {
     winner = [...state.value.players].sort(
@@ -198,7 +201,8 @@ const summary = computed(() => {
 
   let rows = state.value.players.map((p) => ({
     name: p.id === humanId.value ? 'You' : p.nickname,
-    cardsLeft: state.value!.hands[p.id]?.length ?? 0,
+    cardsLeft:
+      state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0,
     delta: isFinal
       ? (state.value!.scores[p.id] ?? 0)
       : (state.value!.roundDelta[p.id] ?? 0),
