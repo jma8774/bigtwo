@@ -53,7 +53,7 @@ const orderedCards = computed<Card[]>(() => {
 
 <template>
   <div class="rounded-2xl bg-white border border-slate-200 shadow-panel px-6 py-5 min-w-[280px]">
-    <header class="flex items-center justify-between gap-3 mb-4">
+    <header class="flex items-center justify-between gap-3 mb-2">
       <span class="text-xs uppercase tracking-[0.18em] font-semibold text-slate-400">
         Current play
       </span>
@@ -73,11 +73,15 @@ const orderedCards = computed<Card[]>(() => {
 
     <!--
       Fixed-height stage so the panel doesn't change size between
-      "cards on the table" and "table is open." Sized to fit the
-      tallest configuration (cards + divider + hand type + name).
+      "cards on the table" and "table is open." With cards present we
+      justify-end so the bottom padding of "Played by …" matches the top
+      padding above the "Current Play" eyebrow. Empty state keeps centering.
     -->
     <div
-      class="flex flex-col items-center justify-center min-h-[200px] 2xl:min-h-[230px]"
+      :class="[
+        'flex flex-col items-center min-h-[180px] 2xl:min-h-[210px]',
+        orderedCards.length ? 'justify-end' : 'justify-center',
+      ]"
     >
       <template v-if="orderedCards.length">
         <div class="flex items-center justify-center gap-2 mb-5">

@@ -292,7 +292,7 @@ const opponentsGridClass = computed(() => {
           shaking ? 'animate-shake' : '',
         ]"
       >
-        <div class="flex items-center justify-between mb-3 gap-3">
+        <div class="flex items-center justify-between gap-3">
           <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Your hand
             <span class="ml-1 text-sm font-normal normal-case tracking-normal text-slate-500"

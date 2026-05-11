@@ -31,7 +31,7 @@ function toggleSound() {
 
 <template>
   <header
-    class="h-16 flex items-center justify-between px-6 bg-white border-b border-slate-200"
+    class="shrink-0 h-16 flex items-center justify-between px-6 bg-white border-b border-slate-200"
   >
     <div class="flex items-center gap-6">
       <RouterLink to="/" class="flex items-center"><AppLogo /></RouterLink>
