@@ -55,6 +55,7 @@ export const useGameStore = defineStore('game', () => {
   const state = ref<GameState | null>(null)
   const selectedIds = ref<Set<string>>(new Set())
   const errorReason = ref<Reason | null>(null)
+  const readyPlayerIds = ref<Set<PlayerId>>(new Set())
 
   // Online session tracking
   const mySessionPlayerId = ref<PlayerId | null>(null)
@@ -200,6 +201,7 @@ export const useGameStore = defineStore('game', () => {
   })
   socket.on('roomUpdated', (room: RoomPublicState) => applyRoomUpdated(room))
   socket.on('gameUpdated', (next: GameState) => {
+    const prevStatus = state.value?.status
     state.value = next
     // Drop selections that reference cards we no longer have.
     if (humanId.value) {
@@ -208,6 +210,15 @@ export const useGameStore = defineStore('game', () => {
       for (const id of selectedIds.value) if (ownIds.has(id)) trimmed.add(id)
       if (trimmed.size !== selectedIds.value.size) selectedIds.value = trimmed
     }
+    // Reset ready set when a new round begins (status flips out of roundOver).
+    if (prevStatus === 'roundOver' && next.status !== 'roundOver') {
+      readyPlayerIds.value = new Set()
+    }
+  })
+  socket.on('playerReady', ({ playerId }: { playerId: PlayerId }) => {
+    const next = new Set(readyPlayerIds.value)
+    next.add(playerId)
+    readyPlayerIds.value = next
   })
   socket.on('invalidMove', ({ reason }: { reason: string }) => {
     errorReason.value = reason as Reason
@@ -371,6 +382,7 @@ export const useGameStore = defineStore('game', () => {
     state,
     selectedIds,
     errorReason,
+    readyPlayerIds,
     botThinkingId,
     mySessionPlayerId,
     isOnlineRoom,

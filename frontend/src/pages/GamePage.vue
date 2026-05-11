@@ -91,62 +91,20 @@ function formatTime(at: number): string {
 }
 
 const shaking = ref(false)
-const readyIds = ref<Set<string>>(new Set())
-let readyTimers: number[] = []
-
-function clearReadyTimers() {
-  for (const t of readyTimers) window.clearTimeout(t)
-  readyTimers = []
-}
 
 const summaryPlayers = computed(() => {
   if (!state.value) return []
   return state.value.players.map((p) => ({
     id: p.id,
     name: p.nickname,
-    ready: readyIds.value.has(p.id),
+    ready: game.readyPlayerIds.has(p.id),
     isYou: p.id === humanId.value,
   }))
 })
 
-watch(
-  () => state.value?.status,
-  (s) => {
-    if (s === 'playing') {
-      readyIds.value = new Set()
-      clearReadyTimers()
-    }
-  },
-)
-
-onBeforeUnmount(clearReadyTimers)
-
 function onReady() {
-  if (!state.value || !humanId.value) return
-  const next = new Set(readyIds.value)
-  next.add(humanId.value)
-  readyIds.value = next
-
-  // Bots ready up with a small staggered delay so the row animates in.
-  const bots = state.value.players.filter((p) => p.isBot)
-  bots.forEach((bot, i) => {
-    const timer = window.setTimeout(
-      () => {
-        const updated = new Set(readyIds.value)
-        updated.add(bot.id)
-        readyIds.value = updated
-        if (state.value && updated.size === state.value.players.length) {
-          window.setTimeout(() => proceed(), 250)
-        }
-      },
-      300 + i * 220,
-    )
-    readyTimers.push(timer)
-  })
-}
-
-function proceed() {
-  clearReadyTimers()
+  // Server tracks ready state and broadcasts playerReady; bots auto-ready
+  // server-side too. We just emit and let the gameStore listener update.
   game.nextRound()
 }
 

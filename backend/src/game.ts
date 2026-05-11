@@ -165,11 +165,42 @@ export function startGameForRoom(
   let state = createInitialState(room.code, room.settings, players, room.hostId)
   state = startRound(state)
   room.gameState = state
+  room.readyPlayerIds.clear()
 
   void emitGameState(io, room)
   io.to(room.code).emit('roomUpdated', publicState(room))
   scheduleBotIfNeeded(io, room)
   return { ok: true }
+}
+
+function allPlayersReady(room: Room): boolean {
+  if (!room.gameState) return false
+  return room.gameState.players.every((p) => room.readyPlayerIds.has(p.id))
+}
+
+function advanceRound(io: Server, room: Room): void {
+  if (!room.gameState) return
+  room.readyPlayerIds.clear()
+  room.gameState = startRound(room.gameState)
+  void emitGameState(io, room)
+  io.to(room.code).emit('roomUpdated', publicState(room))
+  scheduleBotIfNeeded(io, room)
+}
+
+function scheduleBotReadyChecks(io: Server, room: Room): void {
+  if (!room.gameState) return
+  const pending = room.gameState.players.filter(
+    (p) => p.isBot && !room.readyPlayerIds.has(p.id),
+  )
+  pending.forEach((bot, i) => {
+    setTimeout(() => {
+      if (!room.gameState || room.gameState.status !== 'roundOver') return
+      if (room.readyPlayerIds.has(bot.id)) return
+      room.readyPlayerIds.add(bot.id)
+      io.to(room.code).emit('playerReady', { playerId: bot.id })
+      if (allPlayersReady(room)) advanceRound(io, room)
+    }, 300 + i * 220)
+  })
 }
 
 export function playCardsForPlayer(
@@ -223,18 +254,24 @@ export function passTurnForPlayer(
 export function readyForNextRound(
   io: Server,
   roomCode: string,
-  _playerId: string,
+  playerId: string,
 ): GameActionResult {
-  // TICKET-024 will track per-player readiness; until then any ready request
-  // advances the table.
   const room = getRoom(roomCode)
   if (!room || !room.gameState) return { ok: false, error: 'ROOM_NOT_FOUND' }
   if (room.gameState.status !== 'roundOver') {
     return { ok: false, error: 'NOT_BETWEEN_ROUNDS' }
   }
-  room.gameState = startRound(room.gameState)
-  void emitGameState(io, room)
-  io.to(room.code).emit('roomUpdated', publicState(room))
-  scheduleBotIfNeeded(io, room)
+  // Validate the player is actually seated.
+  if (!room.gameState.players.some((p) => p.id === playerId)) {
+    return { ok: false, error: 'NOT_IN_ROOM' }
+  }
+  // Idempotent — duplicate ready clicks are silently absorbed.
+  if (!room.readyPlayerIds.has(playerId)) {
+    room.readyPlayerIds.add(playerId)
+    io.to(room.code).emit('playerReady', { playerId })
+  }
+  // Schedule bots to ready up too (staggered, for the lobby/modal animation).
+  scheduleBotReadyChecks(io, room)
+  if (allPlayersReady(room)) advanceRound(io, room)
   return { ok: true }
 }

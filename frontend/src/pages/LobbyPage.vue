@@ -32,6 +32,13 @@ watch(
 const state = computed(() => game.state)
 const roomCode = computed(() => state.value?.roomCode ?? '')
 const isPublic = computed(() => state.value?.settings.isPublic ?? true)
+const isHost = computed(
+  () => !!state.value?.hostId && state.value.hostId === game.mySessionPlayerId,
+)
+const hostNickname = computed(() => {
+  if (!state.value?.hostId) return ''
+  return state.value.players.find((p) => p.id === state.value?.hostId)?.nickname ?? ''
+})
 
 const AVATAR_COLORS = ['brand', 'emerald', 'amber', 'rose'] as const
 type AvatarColor = (typeof AVATAR_COLORS)[number]
@@ -280,17 +287,28 @@ function leave() {
           Share the code with friends to invite them to your room.
         </p>
 
-        <button
-          type="button"
-          class="mt-6 w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors inline-flex items-center justify-center gap-2"
-          @click="start"
+        <template v-if="isHost">
+          <button
+            type="button"
+            class="mt-6 w-full py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-colors inline-flex items-center justify-center gap-2"
+            @click="start"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M8 5v14l11-7L8 5z" />
+            </svg>
+            Start Game
+          </button>
+          <p class="text-xs text-slate-400 text-center mt-2">
+            You're the host — start the game when everyone's in.
+          </p>
+        </template>
+        <div
+          v-else
+          class="mt-6 w-full py-3 rounded-xl border-2 border-dashed border-slate-200 text-slate-500 text-sm text-center"
         >
-          <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M8 5v14l11-7L8 5z" />
-          </svg>
-          Start Game
-        </button>
-        <p class="text-xs text-slate-400 text-center mt-2">Only the host can start the game.</p>
+          Waiting for <span class="font-semibold text-slate-700">{{ hostNickname || 'the host' }}</span>
+          to start the game…
+        </div>
       </section>
 
       <aside class="space-y-4">

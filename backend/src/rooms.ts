@@ -33,6 +33,8 @@ export type Room = {
   gameState: GameState | null
   /** Server-side bot turn scheduler handle. */
   botTimer: ReturnType<typeof setTimeout> | null
+  /** Players who have signaled ready for the next round (roundOver phase). */
+  readyPlayerIds: Set<PlayerId>
 }
 
 export type PublicPlayer = Pick<RoomPlayer, 'id' | 'nickname' | 'isBot' | 'connected'>
@@ -92,6 +94,7 @@ export function createRoom(
     createdAt: Date.now(),
     gameState: null,
     botTimer: null,
+    readyPlayerIds: new Set<PlayerId>(),
   }
   rooms.set(room.code, room)
   return { room, player }
