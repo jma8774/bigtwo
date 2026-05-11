@@ -17,13 +17,9 @@ const showRules = ref(false)
           <RouterLink to="/" class="text-slate-900 font-medium border-b-2 border-brand-600 pb-1"
             >Home</RouterLink
           >
-          <span class="inline-flex items-center gap-1.5 text-slate-400 cursor-not-allowed">
-            Rooms
-            <span
-              class="text-[10px] uppercase font-semibold tracking-wide bg-slate-100 text-slate-500 rounded px-1.5 py-0.5"
-              >Soon</span
-            >
-          </span>
+          <RouterLink to="/browse" class="text-slate-500 hover:text-slate-900 transition-colors"
+            >Rooms</RouterLink
+          >
         </nav>
       </template>
     </AppTopBar>

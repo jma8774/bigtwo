@@ -4,10 +4,18 @@ import {
   joinRoom,
   rejoinRoom,
   leaveRoom,
+  listPublicRooms,
   markDisconnected,
   publicState,
+  type PublicRoomSummary,
   type RoomSettings,
 } from './rooms'
+
+const PUBLIC_LOBBY_CHANNEL = 'public-lobby-list'
+
+function emitPublicRoomsChanged(io: Server): void {
+  io.to(PUBLIC_LOBBY_CHANNEL).emit('publicRoomsChanged', listPublicRooms())
+}
 
 type SocketData = {
   roomCode?: string
@@ -61,6 +69,7 @@ export function registerHandlers(io: Server): void {
             seatToken: player.seatToken,
           })
           io.to(room.code).emit('roomUpdated', publicState(room))
+          emitPublicRoomsChanged(io)
           console.log(`[room] created ${room.code} by ${player.nickname} (${player.id})`)
         } catch (err) {
           console.error('[createRoom] failed:', err)
@@ -90,6 +99,7 @@ export function registerHandlers(io: Server): void {
           seatToken: player.seatToken,
         })
         io.to(room.code).emit('roomUpdated', publicState(room))
+        emitPublicRoomsChanged(io)
         console.log(`[room] ${player.nickname} (${player.id}) joined ${room.code}`)
       },
     )
@@ -121,7 +131,20 @@ export function registerHandlers(io: Server): void {
       if (after) {
         io.to(roomCode).emit('roomUpdated', publicState(after))
       }
+      emitPublicRoomsChanged(io)
       console.log(`[room] ${playerId} left ${roomCode}`)
+    })
+
+    socket.on(
+      'subscribePublicRooms',
+      (_payload, ack?: (rooms: PublicRoomSummary[]) => void) => {
+        void socket.join(PUBLIC_LOBBY_CHANNEL)
+        ack?.(listPublicRooms())
+      },
+    )
+
+    socket.on('unsubscribePublicRooms', () => {
+      void socket.leave(PUBLIC_LOBBY_CHANNEL)
     })
 
     socket.on('disconnect', (reason) => {
@@ -132,6 +155,7 @@ export function registerHandlers(io: Server): void {
       if (room) {
         io.to(data.roomCode).emit('roomUpdated', publicState(room))
       }
+      emitPublicRoomsChanged(io)
     })
   })
 }

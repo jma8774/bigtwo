@@ -2,7 +2,7 @@
 
 ## Status
 
-Backlog (P2 follow-up, depends on TICKET-007)
+Done
 
 ## Goal
 

@@ -13,7 +13,7 @@ app.use(router)
 // Guard: if a user has an active online room, prevent them from drifting onto
 // the marketing/lobby-entry pages. They must use the explicit Leave button to
 // exit, which clears `isOnlineRoom` before the navigation runs.
-const OUTSIDE_ROOM_ROUTES = new Set(['home', 'create', 'join', 'rules'])
+const OUTSIDE_ROOM_ROUTES = new Set(['home', 'create', 'join', 'browse', 'rules'])
 
 function destinationForStatus(status: string | undefined): string | null {
   if (status === 'waiting') return 'lobby'

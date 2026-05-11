@@ -147,6 +147,39 @@ export function getRoom(code: string): Room | undefined {
   return rooms.get(code)
 }
 
+export type PublicRoomSummary = {
+  roomCode: string
+  hostNickname: string
+  playerCount: 3 | 4
+  seatsTaken: number
+  seatsAvailable: number
+  inProgress: boolean
+  createdAt: number
+}
+
+/**
+ * Snapshot of all active public rooms, newest first, capped at 50.
+ * Private rooms are filtered out — they're never even hinted at to outsiders.
+ */
+export function listPublicRooms(): PublicRoomSummary[] {
+  const out: PublicRoomSummary[] = []
+  for (const room of rooms.values()) {
+    if (!room.settings.isPublic) continue
+    const host = room.players.find((p) => p.id === room.hostId)
+    out.push({
+      roomCode: room.code,
+      hostNickname: host?.nickname ?? 'Unknown',
+      playerCount: room.settings.playerCount,
+      seatsTaken: room.players.length,
+      seatsAvailable: Math.max(0, room.settings.playerCount - room.players.length),
+      inProgress: room.status !== 'waiting',
+      createdAt: room.createdAt,
+    })
+  }
+  out.sort((a, b) => b.createdAt - a.createdAt)
+  return out.slice(0, 50)
+}
+
 export function publicState(room: Room): RoomPublicState {
   return {
     roomCode: room.code,

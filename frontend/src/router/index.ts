@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import HomePage from '@/pages/HomePage.vue'
 import CreateRoomPage from '@/pages/CreateRoomPage.vue'
 import JoinRoomPage from '@/pages/JoinRoomPage.vue'
+import BrowseRoomsPage from '@/pages/BrowseRoomsPage.vue'
 import LobbyPage from '@/pages/LobbyPage.vue'
 import GamePage from '@/pages/GamePage.vue'
 import RulesPage from '@/pages/RulesPage.vue'
@@ -12,6 +13,7 @@ const router = createRouter({
     { path: '/', name: 'home', component: HomePage },
     { path: '/create', name: 'create', component: CreateRoomPage },
     { path: '/join', name: 'join', component: JoinRoomPage },
+    { path: '/browse', name: 'browse', component: BrowseRoomsPage },
     { path: '/lobby', name: 'lobby', component: LobbyPage },
     { path: '/game', name: 'game', component: GamePage },
     { path: '/rules', name: 'rules', component: RulesPage },

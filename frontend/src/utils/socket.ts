@@ -47,3 +47,13 @@ export type RoomAck =
   | { ok: false; error: string }
 
 export type RejoinAck = { ok: true } | { ok: false; error: string }
+
+export type PublicRoomSummary = {
+  roomCode: string
+  hostNickname: string
+  playerCount: 3 | 4
+  seatsTaken: number
+  seatsAvailable: number
+  inProgress: boolean
+  createdAt: number
+}
