@@ -37,17 +37,23 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
   <div
     :class="[
       'relative w-full rounded-2xl bg-white border shadow-panel p-4 2xl:p-5 flex items-center gap-4 2xl:gap-5 transition-all',
-      isOffline
-        ? 'border-rose-300 bg-rose-50/40'
-        : isTurn
-          ? 'border-brand-500 ring-2 ring-brand-100'
-          : 'border-slate-200',
+      isLeft
+        ? 'border-slate-300 bg-slate-100/70 opacity-70'
+        : isDisconnected
+          ? 'border-amber-300 bg-amber-50/40'
+          : isTurn
+            ? 'border-brand-500 ring-2 ring-brand-100'
+            : 'border-slate-200',
     ]"
   >
     <div
       :class="[
         'w-11 h-11 2xl:w-14 2xl:h-14 rounded-full grid place-items-center font-semibold 2xl:text-lg shrink-0',
-        isOffline ? 'bg-rose-100 text-rose-400' : 'bg-slate-100 text-slate-700',
+        isLeft
+          ? 'bg-slate-200 text-slate-400'
+          : isDisconnected
+            ? 'bg-amber-100 text-amber-600'
+            : 'bg-slate-100 text-slate-700',
       ]"
     >
       {{ initials }}
@@ -57,7 +63,11 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
       <p
         :class="[
           'font-medium 2xl:text-lg truncate',
-          isOffline ? 'text-slate-400' : 'text-slate-900',
+          isLeft
+            ? 'text-slate-400 line-through decoration-slate-400/80'
+            : isDisconnected
+              ? 'text-amber-700'
+              : 'text-slate-900',
         ]"
       >
         {{ name }}
@@ -70,7 +80,6 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
       >
         {{ scoreLabel }}
       </p>
-
     </div>
 
     <div class="text-right shrink-0 pl-2">
@@ -100,7 +109,7 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
     </span>
     <span
       v-else-if="isLeft"
-      class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-rose-200 text-rose-600 text-xs font-semibold shadow-sm whitespace-nowrap"
+      class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-slate-300 text-slate-500 text-xs font-semibold shadow-sm whitespace-nowrap"
     >
       <svg
         class="w-3 h-3"
@@ -116,14 +125,14 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
         <polyline points="16 17 21 12 16 7" />
         <line x1="21" y1="12" x2="9" y2="12" />
       </svg>
-      Left
+      Left the game
     </span>
     <span
       v-else-if="isDisconnected"
-      class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-rose-200 text-rose-600 text-xs font-semibold shadow-sm whitespace-nowrap"
+      class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-amber-300 text-amber-700 text-xs font-semibold shadow-sm whitespace-nowrap"
     >
       <svg
-        class="w-3 h-3"
+        class="w-3 h-3 animate-pulse"
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
@@ -140,7 +149,7 @@ const isOffline = computed(() => isDisconnected.value || isLeft.value)
         <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
         <line x1="12" y1="20" x2="12.01" y2="20" />
       </svg>
-      Disconnected
+      Reconnecting…
     </span>
   </div>
 </template>
