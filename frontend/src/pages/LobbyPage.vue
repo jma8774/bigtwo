@@ -30,9 +30,11 @@ const socket = getSocket()
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 
 function sendHeartbeat() {
-  if (game.isOnlineRoom && game.state?.status === 'waiting') {
-    socket.emit('lobbyHeartbeat')
-  }
+  // Gated only on isOnlineRoom (set synchronously in the createRoom /
+  // joinRoom ack). Don't depend on game.state.status — that races with
+  // the roomUpdated arrival, and a missed first heartbeat is dangerous
+  // because the freshly-joined player has only ~10s before eviction.
+  if (game.isOnlineRoom) socket.emit('lobbyHeartbeat')
 }
 
 onMounted(() => {

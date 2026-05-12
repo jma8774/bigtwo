@@ -58,8 +58,11 @@ const lobbySweepHandle = setInterval(async () => {
   const evictions = sweepStaleLobbyPlayers()
   if (evictions.length === 0) return
   const touchedRooms = new Set<string>()
-  for (const { roomCode, playerId, after } of evictions) {
-    log.info(`[lobby] evicted stale player ${playerId} from ${roomCode}`)
+  for (const { roomCode, playerId, staleMs, after } of evictions) {
+    log.info(
+      `[lobby] evicted stale player ${playerId} from ${roomCode} ` +
+        `(no heartbeat for ${staleMs}ms)`,
+    )
     touchedRooms.add(roomCode)
     if (after) {
       io.to(roomCode).emit('roomUpdated', publicState(after))

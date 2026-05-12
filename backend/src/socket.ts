@@ -383,8 +383,18 @@ export function registerHandlers(io: Server): void {
 
     socket.on('lobbyHeartbeat', () => {
       const data = socket.data as SocketData
-      if (!data.roomCode || !data.playerId) return
+      if (!data.roomCode || !data.playerId) {
+        // This is the suspected bug surface — log loudly so we can see it.
+        log.warn(
+          `[heartbeat] dropped (no seat on socket): socket=${socket.id} ` +
+            `roomCode=${data.roomCode ?? 'null'} playerId=${data.playerId ?? 'null'}`,
+        )
+        return
+      }
       recordLobbyHeartbeat(data.roomCode, data.playerId)
+      log.debug(
+        `[heartbeat] ok: socket=${socket.id} room=${data.roomCode} player=${data.playerId}`,
+      )
     })
 
     socket.on('disconnect', (reason) => {

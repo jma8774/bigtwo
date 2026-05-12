@@ -298,8 +298,18 @@ const LOBBY_HEARTBEAT_TIMEOUT_MS = 10_000
  *  of evictions so the caller can broadcast updated room state. */
 export function sweepStaleLobbyPlayers(
   now: number = Date.now(),
-): Array<{ roomCode: string; playerId: string; after: Room | null }> {
-  const out: Array<{ roomCode: string; playerId: string; after: Room | null }> = []
+): Array<{
+  roomCode: string
+  playerId: string
+  staleMs: number
+  after: Room | null
+}> {
+  const out: Array<{
+    roomCode: string
+    playerId: string
+    staleMs: number
+    after: Room | null
+  }> = []
   for (const room of rooms.values()) {
     const status = room.gameState?.status ?? 'waiting'
     if (status !== 'waiting') continue
@@ -311,8 +321,9 @@ export function sweepStaleLobbyPlayers(
     )
     for (const p of stale) {
       const code = room.code
+      const staleMs = now - (p.lobbyHeartbeatAt ?? now)
       const after = leaveRoom(code, p.id)
-      out.push({ roomCode: code, playerId: p.id, after })
+      out.push({ roomCode: code, playerId: p.id, staleMs, after })
       // If leaveRoom dropped the room (last player out), bail before we
       // touch a stale reference.
       if (!after) break
