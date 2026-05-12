@@ -362,17 +362,36 @@ export function registerHandlers(io: Server): void {
       log.info(`[ws] disconnected ${socket.id} (${reason})`)
       const data = socket.data as SocketData
       if (!data.roomCode || !data.playerId) return
-      const room = markDisconnected(data.roomCode, data.playerId)
-      if (room) {
+
+      const existing = getRoom(data.roomCode)
+      if (!existing) {
+        emitPublicRoomsChanged(io)
+        return
+      }
+
+      const inLobby = !existing.gameState || existing.gameState.status === 'waiting'
+
+      if (inLobby) {
+        // Lobby seats don't survive any disconnect — refresh, tab close,
+        // network blip, all evict. The seat opens up for someone else.
+        const after = leaveRoom(data.roomCode, data.playerId)
         log.info(
-          `[room] ${data.playerId} marked disconnected in ${data.roomCode} ` +
-            `status=${room.gameState?.status ?? 'waiting'}`,
+          `[room] ${data.playerId} disconnected from lobby ${data.roomCode}` +
+            (after ? '' : ' (room empty, dropped)'),
         )
-        io.to(data.roomCode).emit('roomUpdated', publicState(room))
-        // Re-broadcast game state so opponents see the disconnected flag, and
-        // re-schedule the auto-turn timer if the disconnect happened on their
-        // own turn (30s timer kicks in).
-        if (room.gameState && room.gameState.status !== 'waiting') {
+        if (after) {
+          io.to(data.roomCode).emit('roomUpdated', publicState(after))
+        }
+      } else {
+        // Mid-game — keep the seat, mark disconnected, 30s auto-pass kicks
+        // in. Player can rejoin with their seatToken.
+        const room = markDisconnected(data.roomCode, data.playerId)
+        if (room) {
+          log.info(
+            `[room] ${data.playerId} marked disconnected in ${data.roomCode} ` +
+              `status=${room.gameState?.status ?? 'waiting'}`,
+          )
+          io.to(data.roomCode).emit('roomUpdated', publicState(room))
           void emitGameStateToAll(io, room.code)
           onPresenceChanged(io, room)
         }
