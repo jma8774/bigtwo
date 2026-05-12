@@ -29,17 +29,6 @@ router.beforeEach((to) => {
   if (game.sessionRestoreState === 'failed') return true
   const dest = destinationForStatus(game.state.status)
   if (!dest || dest === to.name) return true
-
-  // Lobby (status='waiting'): the user pressed a topbar link or browser
-  // back — treat it as "leave the room" rather than anchoring them. The
-  // server-side disconnect/leave evicts them so the seat opens up.
-  // Mid-game (playing / roundOver / matchOver): still anchor. Game forfeits
-  // should require the explicit Leave button.
-  if (game.state.status === 'waiting') {
-    game.endGame()
-    return true
-  }
-
   return { name: dest, replace: true }
 })
 

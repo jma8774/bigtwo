@@ -47,6 +47,7 @@ function makeBotPlayer(seatIndex: number): RoomPlayer {
     connected: true,
     socketId: null,
     seatToken: '',
+    lobbyHeartbeatAt: null,
   }
 }
 

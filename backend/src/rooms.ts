@@ -20,6 +20,10 @@ export type RoomPlayer = {
   socketId: string | null
   /** Server-only secret; never broadcast to other players. */
   seatToken: string
+  /** Last lobby-heartbeat timestamp (epoch ms). Refreshed by the client
+   *  while LobbyPage is mounted; stale entries are evicted by the sweep.
+   *  null for bots and for players who've already left the lobby. */
+  lobbyHeartbeatAt: number | null
 }
 
 export type Room = {
@@ -100,6 +104,7 @@ function makePlayer(nickname: string): RoomPlayer {
     connected: true,
     socketId: null,
     seatToken: newSeatToken(),
+    lobbyHeartbeatAt: Date.now(),
   }
 }
 
@@ -189,6 +194,11 @@ export function rejoinRoom(
   const player = room.players.find((p) => p.id === playerId)
   if (!player || player.seatToken !== seatToken) return { error: 'SEAT_TOKEN_INVALID' }
   player.connected = true
+  // Re-arm the lobby heartbeat so a slow rejoin doesn't immediately re-evict.
+  // (No-op once a game has started — the lobby sweep ignores non-waiting rooms.)
+  if (!room.gameState || room.gameState.status === 'waiting') {
+    player.lobbyHeartbeatAt = Date.now()
+  }
   syncConnectedIntoGameState(room, playerId, true)
   room.allDisconnectedSince = null
   return { room, player }
@@ -268,6 +278,47 @@ export function markMatchOver(code: string): void {
   const room = rooms.get(code)
   if (!room) return
   if (room.matchOverAt === null) room.matchOverAt = Date.now()
+}
+
+/** Refresh a player's lobby heartbeat. Caller is the socket handler, which
+ *  has already authenticated the player via socket.data. */
+export function recordLobbyHeartbeat(code: string, playerId: string): void {
+  const room = rooms.get(code)
+  if (!room) return
+  const player = room.players.find((p) => p.id === playerId)
+  if (!player || player.isBot) return
+  player.lobbyHeartbeatAt = Date.now()
+}
+
+const LOBBY_HEARTBEAT_TIMEOUT_MS = 15_000
+
+/** Find lobby players whose last heartbeat is stale and evict them. Mid-game
+ *  rooms are left alone — gameplay disconnects use the markDisconnected
+ *  path and the 30s auto-pass scheduler, not this sweep. Returns the list
+ *  of evictions so the caller can broadcast updated room state. */
+export function sweepStaleLobbyPlayers(
+  now: number = Date.now(),
+): Array<{ roomCode: string; playerId: string; after: Room | null }> {
+  const out: Array<{ roomCode: string; playerId: string; after: Room | null }> = []
+  for (const room of rooms.values()) {
+    const status = room.gameState?.status ?? 'waiting'
+    if (status !== 'waiting') continue
+    const stale = room.players.filter(
+      (p) =>
+        !p.isBot &&
+        p.lobbyHeartbeatAt !== null &&
+        now - p.lobbyHeartbeatAt > LOBBY_HEARTBEAT_TIMEOUT_MS,
+    )
+    for (const p of stale) {
+      const code = room.code
+      const after = leaveRoom(code, p.id)
+      out.push({ roomCode: code, playerId: p.id, after })
+      // If leaveRoom dropped the room (last player out), bail before we
+      // touch a stale reference.
+      if (!after) break
+    }
+  }
+  return out
 }
 
 const WAITING_IDLE_MS = 30 * 60 * 1000

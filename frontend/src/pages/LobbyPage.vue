@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import { useGameStore } from '@/stores/gameStore'
+import { getSocket } from '@/utils/socket'
 
 const router = useRouter()
 const game = useGameStore()
@@ -19,6 +20,31 @@ function maybeRedirectHome() {
 
 onMounted(() => {
   maybeRedirectHome()
+})
+
+// Lobby liveness heartbeat. The server sweeps any lobby player who hasn't
+// pinged in ~15s, which catches SPA navigation away (Home icon, Rooms link,
+// browser back, etc.) — the interval gets cleared when this component
+// unmounts, so the server stops hearing from us and evicts.
+const socket = getSocket()
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+function sendHeartbeat() {
+  if (game.isOnlineRoom && game.state?.status === 'waiting') {
+    socket.emit('lobbyHeartbeat')
+  }
+}
+
+onMounted(() => {
+  sendHeartbeat()
+  heartbeatTimer = setInterval(sendHeartbeat, 5_000)
+})
+
+onBeforeUnmount(() => {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
 })
 
 // If the session restore resolves while we're sitting here, react.

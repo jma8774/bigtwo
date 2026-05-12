@@ -9,6 +9,7 @@ import {
   listPublicRooms,
   markDisconnected,
   publicState,
+  recordLobbyHeartbeat,
   type PublicRoomSummary,
   type RoomSettings,
 } from './rooms.js'
@@ -357,6 +358,12 @@ export function registerHandlers(io: Server): void {
         ack?.({ ok: true })
       },
     )
+
+    socket.on('lobbyHeartbeat', () => {
+      const data = socket.data as SocketData
+      if (!data.roomCode || !data.playerId) return
+      recordLobbyHeartbeat(data.roomCode, data.playerId)
+    })
 
     socket.on('disconnect', (reason) => {
       log.info(`[ws] disconnected ${socket.id} (${reason})`)
