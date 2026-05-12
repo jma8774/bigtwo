@@ -242,6 +242,16 @@ export function leaveRoom(code: string, playerId: string): Room | null {
     }
   }
 
+  // If the last human left an active room, arm the all-disconnected timer
+  // so the sweep eventually drops it. Without this, an active room with
+  // only bots loops forever.
+  if (wasMidGame) {
+    const anyHumanConnected = room.players.some((p) => !p.isBot && p.connected)
+    if (!anyHumanConnected && room.allDisconnectedSince === null) {
+      room.allDisconnectedSince = Date.now()
+    }
+  }
+
   return room
 }
 
@@ -349,10 +359,19 @@ export function sweepExpiredRooms(now: number = Date.now()): string[] {
       expired =
         room.matchOverAt !== null && now - room.matchOverAt > MATCH_OVER_GRACE_MS
     } else {
-      // playing or roundOver — only expire when nobody is around to play.
-      expired =
-        room.allDisconnectedSince !== null &&
-        now - room.allDisconnectedSince > ACTIVE_ALL_DISCONNECTED_MS
+      // playing or roundOver — drop immediately if literally no humans are
+      // seated (everyone explicitly Left, or the sweep ran a beat after the
+      // last leave). Bots alone shouldn't keep a room alive.
+      const noHumansSeated = room.players.every((p) => p.isBot)
+      if (noHumansSeated) {
+        expired = true
+      } else {
+        // Otherwise wait the 10-min grace before evicting a room where all
+        // humans are present-but-disconnected (might rejoin).
+        expired =
+          room.allDisconnectedSince !== null &&
+          now - room.allDisconnectedSince > ACTIVE_ALL_DISCONNECTED_MS
+      }
     }
     if (expired) {
       if (room.botTimer) clearTimeout(room.botTimer)
