@@ -91,6 +91,26 @@ function clearSocketSeat(socket: Socket): { roomCode?: string; playerId?: string
   return out
 }
 
+/** If this socket already has a seat in some room (e.g. the client did an
+ *  SPA nav back to /create or /join without explicitly leaving), drop the
+ *  old seat first. Otherwise the room would briefly hold two entries for
+ *  the same browser until the lobby heartbeat sweep cleans it up. */
+function releaseExistingSeat(io: Server, socket: Socket): void {
+  const data = socket.data as SocketData
+  if (!data.roomCode || !data.playerId) return
+  const oldRoomCode = data.roomCode
+  const oldPlayerId = data.playerId
+  const after = leaveRoom(oldRoomCode, oldPlayerId)
+  if (after) {
+    io.to(oldRoomCode).emit('roomUpdated', publicState(after))
+  }
+  clearSocketSeat(socket)
+  log.info(
+    `[room] released stale seat ${oldPlayerId} from ${oldRoomCode} ` +
+      `before re-binding socket ${socket.id}`,
+  )
+}
+
 export function registerHandlers(io: Server): void {
   io.on('connection', (socket) => {
     log.info(`[ws] connected ${socket.id}`)
@@ -106,6 +126,7 @@ export function registerHandlers(io: Server): void {
         ack?: (response: CreateAck) => void,
       ) => {
         try {
+          releaseExistingSeat(io, socket)
           const result = createRoom(payload?.nickname, payload?.settings)
           if ('error' in result) {
             log.warn(`[room] createRoom refused reason=${result.error}`)
@@ -141,6 +162,7 @@ export function registerHandlers(io: Server): void {
         payload: { roomCode: string; nickname: string },
         ack?: (response: JoinAck) => void,
       ) => {
+        releaseExistingSeat(io, socket)
         const result = joinRoom(payload.roomCode, payload.nickname)
         if ('error' in result) {
           log.info(
