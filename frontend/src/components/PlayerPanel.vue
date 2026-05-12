@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-export type PlayerStatus = 'turn' | 'disconnected'
+export type PlayerStatus = 'turn' | 'disconnected' | 'left'
 
 const props = withDefaults(
   defineProps<{
@@ -29,13 +29,15 @@ const initials = computed(() => props.initials ?? props.name.slice(0, 1).toUpper
 
 const isTurn = computed(() => props.status === 'turn' || props.active)
 const isDisconnected = computed(() => props.status === 'disconnected')
+const isLeft = computed(() => props.status === 'left')
+const isOffline = computed(() => isDisconnected.value || isLeft.value)
 </script>
 
 <template>
   <div
     :class="[
       'relative w-full rounded-2xl bg-white border shadow-panel p-4 2xl:p-5 flex items-center gap-4 2xl:gap-5 transition-all',
-      isDisconnected
+      isOffline
         ? 'border-rose-300 bg-rose-50/40'
         : isTurn
           ? 'border-brand-500 ring-2 ring-brand-100'
@@ -45,7 +47,7 @@ const isDisconnected = computed(() => props.status === 'disconnected')
     <div
       :class="[
         'w-11 h-11 2xl:w-14 2xl:h-14 rounded-full grid place-items-center font-semibold 2xl:text-lg shrink-0',
-        isDisconnected ? 'bg-rose-100 text-rose-400' : 'bg-slate-100 text-slate-700',
+        isOffline ? 'bg-rose-100 text-rose-400' : 'bg-slate-100 text-slate-700',
       ]"
     >
       {{ initials }}
@@ -55,7 +57,7 @@ const isDisconnected = computed(() => props.status === 'disconnected')
       <p
         :class="[
           'font-medium 2xl:text-lg truncate',
-          isDisconnected ? 'text-slate-400' : 'text-slate-900',
+          isOffline ? 'text-slate-400' : 'text-slate-900',
         ]"
       >
         {{ name }}
@@ -63,7 +65,7 @@ const isDisconnected = computed(() => props.status === 'disconnected')
       <p
         :class="[
           'text-sm 2xl:text-base font-semibold',
-          isDisconnected ? 'text-slate-400' : scoreColor,
+          isOffline ? 'text-slate-400' : scoreColor,
         ]"
       >
         {{ scoreLabel }}
@@ -75,7 +77,7 @@ const isDisconnected = computed(() => props.status === 'disconnected')
       <p
         :class="[
           'text-3xl 2xl:text-4xl font-bold tabular-nums leading-none',
-          isDisconnected ? 'text-slate-400' : 'text-slate-900',
+          isOffline ? 'text-slate-400' : 'text-slate-900',
         ]"
       >
         {{ cardCount }}
@@ -85,7 +87,7 @@ const isDisconnected = computed(() => props.status === 'disconnected')
 
     <!-- Status bubble: peeks out from the bottom-left edge of the panel. -->
     <span
-      v-if="isTurn && !isDisconnected"
+      v-if="isTurn && !isOffline"
       class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-brand-200 text-brand-700 text-xs font-semibold shadow-sm whitespace-nowrap"
     >
       <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
@@ -95,6 +97,26 @@ const isDisconnected = computed(() => props.status === 'disconnected')
           <span>.</span><span>.</span><span>.</span>
         </span>
       </span>
+    </span>
+    <span
+      v-else-if="isLeft"
+      class="absolute -bottom-2 left-3 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white border border-rose-200 text-rose-600 text-xs font-semibold shadow-sm whitespace-nowrap"
+    >
+      <svg
+        class="w-3 h-3"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+        <polyline points="16 17 21 12 16 7" />
+        <line x1="21" y1="12" x2="9" y2="12" />
+      </svg>
+      Left
     </span>
     <span
       v-else-if="isDisconnected"

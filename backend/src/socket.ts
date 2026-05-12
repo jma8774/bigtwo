@@ -166,6 +166,13 @@ export function registerHandlers(io: Server): void {
       const after = leaveRoom(roomCode, playerId)
       if (after) {
         io.to(roomCode).emit('roomUpdated', publicState(after))
+        // Mid-game leave: gameState.players[i].left = true. Rebroadcast so
+        // remaining clients see the "Left" badge, and re-schedule the auto-
+        // turn timer in case it was the leaver's turn.
+        if (after.gameState && after.gameState.status !== 'waiting') {
+          void emitGameStateToAll(io, after.code)
+          onPresenceChanged(io, after)
+        }
       }
       emitPublicRoomsChanged(io)
       log.info(`[room] ${playerId} left ${roomCode}` + (after ? '' : ' (room empty, dropped)'))

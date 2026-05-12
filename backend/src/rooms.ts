@@ -151,14 +151,29 @@ function syncConnectedIntoGameState(room: Room, playerId: string, connected: boo
 export function leaveRoom(code: string, playerId: string): Room | null {
   const room = rooms.get(code)
   if (!room) return null
+  const wasMidGame = !!room.gameState && room.gameState.status !== 'waiting'
+
   room.players = room.players.filter((p) => p.id !== playerId)
-  if (room.players.length === 0) {
+  if (room.players.length === 0 && !wasMidGame) {
     rooms.delete(code)
     return null
   }
-  if (room.hostId === playerId) {
+  if (room.hostId === playerId && room.players.length > 0) {
     room.hostId = room.players[0].id
   }
+
+  // Keep the leaver in gameState so turn rotation still works, but flag
+  // `left` so the UI can show "Left" and the auto-turn scheduler treats
+  // their turn like a disconnect (30s pass).
+  if (wasMidGame && room.gameState) {
+    const idx = room.gameState.players.findIndex((p) => p.id === playerId)
+    if (idx !== -1) {
+      const players = room.gameState.players.slice()
+      players[idx] = { ...players[idx], left: true, connected: false }
+      room.gameState = { ...room.gameState, players }
+    }
+  }
+
   return room
 }
 

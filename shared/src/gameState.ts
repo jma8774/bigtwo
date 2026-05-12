@@ -8,6 +8,11 @@ export type Player = {
   nickname: string
   isBot: boolean
   connected: boolean
+  /** True once the player has explicitly left mid-game (Leave button or kick).
+   *  Distinct from a transient disconnect — `left` doesn't get cleared on
+   *  rejoin. The seat is retained in gameState.players so turn order keeps
+   *  working; auto-pass drives their turns just like a disconnect would. */
+  left?: boolean
   disconnectedAt?: number | null
   replacedByBot?: boolean
 }

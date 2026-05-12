@@ -130,7 +130,7 @@ function takeAutoTurn(io: Server, room: Room, playerId: string, asBot: boolean):
   // window between scheduling and firing.
   const current = room.gameState.players.find((p) => p.id === playerId)
   if (!current) return
-  if (!asBot && current.connected && !AUTO_PASS_HUMANS) return
+  if (!asBot && current.connected && !current.left && !AUTO_PASS_HUMANS) return
 
   if (asBot) {
     const move = chooseBotMove(room.gameState, playerId)
@@ -196,12 +196,14 @@ function scheduleAutoTurnIfNeeded(io: Server, room: Room): void {
     return
   }
 
-  if (!current.connected) {
+  if (!current.connected || current.left) {
     const id = current.id
+    // Left seats don't need the full 30s grace — they're gone for good.
+    const delay = current.left ? 600 : DISCONNECT_AUTO_TURN_MS
     room.botTimer = setTimeout(() => {
       room.botTimer = null
       takeAutoTurn(io, room, id, false)
-    }, DISCONNECT_AUTO_TURN_MS)
+    }, delay)
     return
   }
 
@@ -214,24 +216,27 @@ function scheduleAutoTurnIfNeeded(io: Server, room: Room): void {
   }
 }
 
-/** Disconnected players auto-ready between rounds so a single offline seat
- *  can't stall the table. */
+/** Disconnected / left players auto-ready between rounds so a single offline
+ *  seat can't stall the table. */
 function maybeAutoReadyDisconnected(io: Server, room: Room): void {
   if (!room.gameState || room.gameState.status !== 'roundOver') return
-  const disconnected = room.gameState.players.filter(
-    (p) => !p.isBot && !p.connected && !room.readyPlayerIds.has(p.id),
+  const offline = room.gameState.players.filter(
+    (p) => !p.isBot && (!p.connected || p.left) && !room.readyPlayerIds.has(p.id),
   )
-  for (const p of disconnected) {
+  for (const p of offline) {
+    const delay = p.left ? 300 : DISCONNECT_AUTO_TURN_MS
     setTimeout(() => {
       if (!room.gameState || room.gameState.status !== 'roundOver') return
       if (room.readyPlayerIds.has(p.id)) return
-      // Still disconnected? mark ready.
       const fresh = room.gameState.players.find((x) => x.id === p.id)
-      if (!fresh || fresh.connected) return
+      if (!fresh) return
+      // Re-confirm: a `left` player can't come back, but a `connected` player
+      // may have rejoined and should drive their own ready click.
+      if (fresh.connected && !fresh.left) return
       room.readyPlayerIds.add(p.id)
       io.to(room.code).emit('playerReady', { playerId: p.id })
       if (allPlayersReady(room)) advanceRound(io, room)
-    }, DISCONNECT_AUTO_TURN_MS)
+    }, delay)
   }
 }
 

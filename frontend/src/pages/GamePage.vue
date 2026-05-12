@@ -34,20 +34,23 @@ const opponents = computed(() => {
     .map((p) => {
       const isTurn =
         state.value!.currentPlayerId === p.id && state.value!.status === 'playing'
-      const disconnected = !p.isBot && p.connected === false
+      const left = !p.isBot && p.left === true
+      const disconnected = !p.isBot && !left && p.connected === false
       return {
         name: p.nickname,
         cardCount:
           state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0,
         score: state.value!.scores[p.id] ?? 0,
-        // Disconnected takes priority over the turn badge — a stale "their turn"
-        // chip on a dropped opponent is confusing.
-        status: disconnected
-          ? ('disconnected' as const)
-          : isTurn
-            ? ('turn' as const)
-            : undefined,
-        active: isTurn && !disconnected,
+        // Offline states take priority over the turn badge — a stale "their
+        // turn" chip on a dropped/gone opponent is confusing.
+        status: left
+          ? ('left' as const)
+          : disconnected
+            ? ('disconnected' as const)
+            : isTurn
+              ? ('turn' as const)
+              : undefined,
+        active: isTurn && !left && !disconnected,
         thinking: game.botThinkingId === p.id,
       }
     })
