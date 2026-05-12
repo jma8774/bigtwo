@@ -86,8 +86,33 @@ const roundLimitLabel = computed(() => {
     : `${state.value.settings.roundLimit}`
 })
 
+const inviteLink = computed(() => {
+  if (!roomCode.value) return ''
+  return `${window.location.origin}/join?code=${roomCode.value}`
+})
+
+const copied = ref<'code' | 'link' | null>(null)
+let copiedTimer: ReturnType<typeof setTimeout> | null = null
+
+function flashCopied(kind: 'code' | 'link') {
+  copied.value = kind
+  if (copiedTimer) clearTimeout(copiedTimer)
+  copiedTimer = setTimeout(() => {
+    copied.value = null
+    copiedTimer = null
+  }, 1500)
+}
+
 function copy() {
-  if (roomCode.value) navigator.clipboard.writeText(roomCode.value).catch(() => {})
+  if (!roomCode.value) return
+  navigator.clipboard.writeText(roomCode.value).catch(() => {})
+  flashCopied('code')
+}
+
+function copyLink() {
+  if (!inviteLink.value) return
+  navigator.clipboard.writeText(inviteLink.value).catch(() => {})
+  flashCopied('link')
 }
 
 function start() {
@@ -178,7 +203,7 @@ function leave() {
             <div class="flex gap-2">
               <button
                 type="button"
-                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-700 text-sm font-medium hover:bg-brand-100"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-700 text-sm font-medium hover:bg-brand-100 min-w-[88px] justify-center"
                 @click="copy"
               >
                 <svg
@@ -194,7 +219,27 @@ function leave() {
                   <rect x="9" y="9" width="13" height="13" rx="2" />
                   <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                 </svg>
-                Copy
+                {{ copied === 'code' ? 'Copied!' : 'Copy code' }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-brand-200 text-brand-700 text-sm font-medium hover:bg-brand-100 min-w-[88px] justify-center"
+                @click="copyLink"
+              >
+                <svg
+                  class="w-4 h-4"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
+                {{ copied === 'link' ? 'Copied!' : 'Copy link' }}
               </button>
             </div>
           </div>

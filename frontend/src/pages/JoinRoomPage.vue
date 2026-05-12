@@ -1,19 +1,31 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import { useGameStore } from '@/stores/gameStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
 const router = useRouter()
+const route = useRoute()
 const game = useGameStore()
 const settings = useSettingsStore()
 const { nickname } = storeToRefs(settings)
 const showRules = ref(false)
 
 const code = ref<string[]>(['', '', '', ''])
+
+onMounted(() => {
+  // Pre-fill from a `?code=ABCD` share link. Strip non-[A-Z2-9] (the room
+  // code charset), uppercase, take the first 4. Anything else is ignored.
+  const raw = (route.query.code ?? '') as string
+  const cleaned = raw.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 4)
+  if (cleaned.length === 0) return
+  const next = ['', '', '', '']
+  for (let i = 0; i < cleaned.length; i++) next[i] = cleaned[i]
+  code.value = next
+})
 const joining = ref(false)
 const errorMessage = ref<string | null>(null)
 
