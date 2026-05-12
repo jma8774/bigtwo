@@ -260,7 +260,10 @@ const opponentsGridClass = computed(() => {
 
       <div
         :class="[
-          'relative z-10 rounded-2xl bg-white border border-slate-200 shadow-panel px-6 pt-5 pb-6',
+          'relative z-10 rounded-2xl bg-white shadow-panel px-6 pt-5 pb-6 border transition-all',
+          isHumanTurn
+            ? 'border-brand-500 ring-2 ring-brand-100'
+            : 'border-slate-200',
           shaking ? 'animate-shake' : '',
         ]"
       >
