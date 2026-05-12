@@ -4,15 +4,11 @@ import type { Card } from '@bigtwo/shared'
 import { rankValue, suitValue } from '@bigtwo/shared'
 import PlayingCard from './PlayingCard.vue'
 
-const props = withDefaults(
-  defineProps<{
-    cards: Card[]
-    handType?: string
-    playedBy?: string
-    yourTurn?: boolean
-  }>(),
-  { yourTurn: false },
-)
+const props = defineProps<{
+  cards: Card[]
+  handType?: string
+  playedBy?: string
+}>()
 
 const TYPE_LABELS: Record<string, string> = {
   single: 'Single',
@@ -56,18 +52,6 @@ const orderedCards = computed<Card[]>(() => {
     <header class="flex items-center justify-between gap-3 mb-2">
       <span class="text-xs uppercase tracking-[0.18em] font-semibold text-slate-400">
         Current play
-      </span>
-      <span
-        v-if="yourTurn"
-        class="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-700"
-      >
-        <span class="relative flex w-2 h-2">
-          <span
-            class="absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75 animate-ping"
-          />
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-500" />
-        </span>
-        Your turn
       </span>
     </header>
 

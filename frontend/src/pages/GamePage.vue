@@ -253,7 +253,6 @@ const opponentsGridClass = computed(() => {
               :cards="currentPlayCards"
               :handType="currentPlayType"
               :playedBy="currentPlayBy"
-              :yourTurn="isHumanTurn"
             />
           </div>
         </div>
