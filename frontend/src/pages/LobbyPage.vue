@@ -37,7 +37,9 @@ function sendHeartbeat() {
 
 onMounted(() => {
   sendHeartbeat()
-  heartbeatTimer = setInterval(sendHeartbeat, 5_000)
+  // 3s cadence with a 10s server timeout = three pings worth of slack
+  // before eviction, so a single dropped packet won't false-positive.
+  heartbeatTimer = setInterval(sendHeartbeat, 3_000)
 })
 
 onBeforeUnmount(() => {

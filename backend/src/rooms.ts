@@ -290,7 +290,7 @@ export function recordLobbyHeartbeat(code: string, playerId: string): void {
   player.lobbyHeartbeatAt = Date.now()
 }
 
-const LOBBY_HEARTBEAT_TIMEOUT_MS = 15_000
+const LOBBY_HEARTBEAT_TIMEOUT_MS = 10_000
 
 /** Find lobby players whose last heartbeat is stale and evict them. Mid-game
  *  rooms are left alone — gameplay disconnects use the markDisconnected
