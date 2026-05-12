@@ -1,7 +1,7 @@
-import type { Card } from './cards'
-import { evaluate } from './handEvaluation'
-import { generateLegalPlays } from './legalMoves'
-import type { GameState, PlayerId } from './gameState'
+import type { Card } from './cards.js'
+import { evaluate } from './handEvaluation.js'
+import { generateLegalPlays } from './legalMoves.js'
+import type { GameState, PlayerId } from './gameState.js'
 
 export type BotMove = { type: 'play'; cards: Card[] } | { type: 'pass' }
 

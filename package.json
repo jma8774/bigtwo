@@ -2,5 +2,13 @@
   "name": "bigtwo",
   "version": "0.0.0",
   "private": true,
-  "workspaces": ["frontend", "backend", "shared"]
+  "workspaces": ["frontend", "backend", "shared"],
+  "scripts": {
+    "build": "npm -w @bigtwo/shared run build && npm -w @bigtwo/backend run build && npm -w @bigtwo/frontend run build",
+    "build:shared": "npm -w @bigtwo/shared run build",
+    "build:backend": "npm -w @bigtwo/backend run build",
+    "build:frontend": "npm -w @bigtwo/frontend run build",
+    "type-check": "npm -w @bigtwo/shared run type-check && npm -w @bigtwo/backend run type-check && npm -w @bigtwo/frontend run type-check",
+    "start": "node backend/dist/index.js"
+  }
 }

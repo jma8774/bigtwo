@@ -1,7 +1,11 @@
 import { io, type Socket } from 'socket.io-client'
 
+// In dev (`import.meta.env.DEV`) we point at the dedicated backend dev port.
+// In prod, Nginx proxies /socket.io/ on the same origin, so we connect to "".
+// VITE_SERVER_URL can override either when needed (e.g. mobile testing).
 const SERVER_URL =
-  (import.meta.env.VITE_SERVER_URL as string | undefined) ?? 'http://localhost:3001'
+  (import.meta.env.VITE_SERVER_URL as string | undefined) ??
+  (import.meta.env.DEV ? 'http://localhost:3001' : '')
 
 let socket: Socket | null = null
 

@@ -1,8 +1,8 @@
-import { buildServer } from './server'
-import { registerHandlers } from './socket'
-import { PORT } from './config'
-import { listPublicRooms, sweepExpiredRooms } from './rooms'
-import { flushLogsSync, log } from './logger'
+import { buildServer } from './server.js'
+import { registerHandlers } from './socket.js'
+import { PORT } from './config.js'
+import { listPublicRooms, sweepExpiredRooms } from './rooms.js'
+import { flushLogsSync, log } from './logger.js'
 
 const { httpServer, io } = buildServer()
 registerHandlers(io)

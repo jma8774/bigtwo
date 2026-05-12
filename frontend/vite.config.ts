@@ -8,6 +8,9 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
+    // Read @bigtwo/shared from its TS source rather than dist/ in dev so HMR
+    // tracks engine changes without needing a separate shared rebuild.
+    conditions: ['source', 'browser', 'module', 'import', 'default'],
   },
   test: {
     environment: 'jsdom',

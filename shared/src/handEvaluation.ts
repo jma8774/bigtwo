@@ -1,6 +1,6 @@
-import type { Card, Rank } from './cards'
-import { rankValue, suitValue } from './cards'
-import type { PlayedHand, PlayedHandType } from './gameState'
+import type { Card, Rank } from './cards.js'
+import { rankValue, suitValue } from './cards.js'
+import type { PlayedHand, PlayedHandType } from './gameState.js'
 
 export const FIVE_CARD_TYPES: PlayedHandType[] = [
   'straight',

@@ -10,7 +10,7 @@ import {
   publicState,
   type PublicRoomSummary,
   type RoomSettings,
-} from './rooms'
+} from './rooms.js'
 import {
   emitGameStateToAll,
   emitGameStateToSocket,
@@ -20,8 +20,8 @@ import {
   readyForNextRound,
   startGameForRoom,
   type GameActionResult,
-} from './game'
-import { log } from './logger'
+} from './game.js'
+import { log } from './logger.js'
 
 const PUBLIC_LOBBY_CHANNEL = 'public-lobby-list'
 

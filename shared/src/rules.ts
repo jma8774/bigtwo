@@ -1,7 +1,7 @@
-import type { Card, Suit } from './cards'
-import type { GameState, PlayerId } from './gameState'
-import { moveCurrentPlayToPile } from './gameState'
-import { evaluate, FIVE_CARD_TYPES } from './handEvaluation'
+import type { Card, Suit } from './cards.js'
+import type { GameState, PlayerId } from './gameState.js'
+import { moveCurrentPlayToPile } from './gameState.js'
+import { evaluate, FIVE_CARD_TYPES } from './handEvaluation.js'
 
 export type Reason =
   | 'NOT_YOUR_TURN'

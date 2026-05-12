@@ -1,7 +1,7 @@
 import express from 'express'
 import { createServer } from 'node:http'
 import { Server as IOServer } from 'socket.io'
-import { CORS_ORIGIN } from './config'
+import { CORS_ORIGIN } from './config.js'
 
 // In dev we accept any localhost origin so Vite picking 5173/5174/5175 etc.
 // all work. In prod CORS_ORIGIN should be set to the deployed origin.

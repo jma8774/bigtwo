@@ -1,0 +1,27 @@
+[Unit]
+Description=BigTwo Socket.IO backend
+Documentation=https://github.com/jma8774/bigtwo
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bigtwo
+Group=bigtwo
+WorkingDirectory=/var/www/bigtwo-app/backend
+EnvironmentFile=/etc/bigtwo.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=2
+KillMode=mixed
+TimeoutStopSec=10
+
+# Hardening — backend has no on-disk state (in-memory rooms only).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/bigtwo
+
+[Install]
+WantedBy=multi-user.target

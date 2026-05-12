@@ -1,4 +1,4 @@
-import type { GameState, PlayerId } from './gameState'
+import type { GameState, PlayerId } from './gameState.js'
 
 export function calculateRoundDelta(state: GameState): Record<PlayerId, number> {
   const cardValue = state.settings.cardValue

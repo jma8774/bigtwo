@@ -1,5 +1,5 @@
-import type { Card } from './cards'
-import { RANKS, SUITS, cardId } from './cards'
+import type { Card } from './cards.js'
+import { RANKS, SUITS, cardId } from './cards.js'
 
 export type RNG = () => number
 

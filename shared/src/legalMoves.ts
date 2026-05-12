@@ -1,6 +1,6 @@
-import type { Card } from './cards'
-import { evaluate, FIVE_CARD_TYPES } from './handEvaluation'
-import type { PlayedHand } from './gameState'
+import type { Card } from './cards.js'
+import { evaluate, FIVE_CARD_TYPES } from './handEvaluation.js'
+import type { PlayedHand } from './gameState.js'
 
 function combinations<T>(arr: T[], k: number): T[][] {
   if (k === 0) return [[]]

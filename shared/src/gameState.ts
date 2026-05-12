@@ -1,5 +1,5 @@
-import type { Card } from './cards'
-import { createDeck, shuffle, deal } from './deck'
+import type { Card } from './cards.js'
+import { createDeck, shuffle, deal } from './deck.js'
 
 export type PlayerId = string
 

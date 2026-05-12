@@ -20,8 +20,8 @@ import {
   shufflePlayersInPlace,
   type Room,
   type RoomPlayer,
-} from './rooms'
-import { log } from './logger'
+} from './rooms.js'
+import { log } from './logger.js'
 
 const BOT_TURN_DELAY_MS = 700
 const DISCONNECT_AUTO_TURN_MS = 30_000
