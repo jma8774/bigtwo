@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import { useGameStore } from '@/stores/gameStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const router = useRouter()
 const game = useGameStore()
+const settings = useSettingsStore()
+const { nickname } = storeToRefs(settings)
 const showRules = ref(false)
 
-const nickname = ref('')
 const code = ref<string[]>(['', '', '', ''])
 const joining = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -71,7 +74,7 @@ async function join() {
   if (!canJoin.value) return
   joining.value = true
   errorMessage.value = null
-  const ok = await game.joinRoomOnline(codeStr.value, nickname.value || 'Guest')
+  const ok = await game.joinRoomOnline(codeStr.value, nickname.value.trim() || 'Guest')
   joining.value = false
   if (ok) {
     router.push({ name: 'lobby' })
@@ -207,8 +210,8 @@ async function join() {
 
           <button
             type="button"
-            disabled
-            class="w-full py-2.5 rounded-xl border border-slate-200 text-slate-400 font-medium bg-slate-50 cursor-not-allowed inline-flex items-center justify-center gap-2"
+            class="w-full py-2.5 rounded-xl border border-slate-200 text-slate-700 font-medium bg-white hover:bg-slate-50 transition-colors inline-flex items-center justify-center gap-2"
+            @click="router.push({ name: 'browse' })"
           >
             <svg
               class="w-4 h-4"
@@ -224,10 +227,6 @@ async function join() {
               <line x1="21" y1="21" x2="16.65" y2="16.65" />
             </svg>
             Find Public Rooms
-            <span
-              class="text-[10px] uppercase font-semibold tracking-wide bg-slate-200 text-slate-500 rounded px-1.5 py-0.5"
-              >Soon</span
-            >
           </button>
         </div>
       </section>

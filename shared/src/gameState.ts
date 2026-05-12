@@ -40,7 +40,6 @@ export type MoveLogEntry = {
 export type RoomSettings = {
   playerCount: 3 | 4
   fillWithBots: boolean
-  botDifficulty: 'basic'
   scoringMode: 'simple'
   cardValue: number
   roundLimit: number | null

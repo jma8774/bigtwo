@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
@@ -10,9 +11,9 @@ import { useSettingsStore } from '@/stores/settingsStore'
 const router = useRouter()
 const game = useGameStore()
 const settings = useSettingsStore()
+const { nickname } = storeToRefs(settings)
 
 const showRules = ref(false)
-const nickname = ref(settings.nickname || 'You')
 const rooms = ref<PublicRoomSummary[]>([])
 const loading = ref(true)
 const joiningCode = ref<string | null>(null)
@@ -60,7 +61,6 @@ async function joinRoom(code: string) {
   joiningCode.value = code
   errorMessage.value = null
   const trimmed = nickname.value.trim() || 'Guest'
-  settings.nickname = trimmed
   const ok = await game.joinRoomOnline(code, trimmed)
   joiningCode.value = null
   if (ok) {

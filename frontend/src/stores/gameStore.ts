@@ -14,6 +14,7 @@ import {
 import { playSound } from '@/utils/sound'
 import {
   getSocket,
+  type ChatMessage,
   type RejoinAck,
   type RoomAck,
   type RoomPublicState,
@@ -56,6 +57,14 @@ export const useGameStore = defineStore('game', () => {
   const selectedIds = ref<Set<string>>(new Set())
   const errorReason = ref<Reason | null>(null)
   const readyPlayerIds = ref<Set<PlayerId>>(new Set())
+  const chatMessages = ref<ChatMessage[]>([])
+  /** Local hand-order preference (card ids). Survives across gameUpdated
+   *  pushes — the server doesn't know or care about display order. Reset on
+   *  endGame. Cleared cards drop out; new-round cards land at the end. */
+  const handOrder = ref<string[]>([])
+  /** Set when the server force-closes the room (e.g. sweep). The router-level
+   *  watcher reads this to show a one-time notice and routes home. */
+  const closedReason = ref<string | null>(null)
 
   // Online session tracking
   const mySessionPlayerId = ref<PlayerId | null>(null)
@@ -74,7 +83,21 @@ export const useGameStore = defineStore('game', () => {
   )
   const humanHand = computed<Card[]>(() => {
     if (!state.value || !humanId.value) return []
-    return state.value.hands[humanId.value] ?? []
+    const raw = state.value.hands[humanId.value] ?? []
+    if (handOrder.value.length === 0) return raw
+    const byId = new Map(raw.map((c) => [c.id, c]))
+    const ordered: Card[] = []
+    for (const id of handOrder.value) {
+      const c = byId.get(id)
+      if (c) {
+        ordered.push(c)
+        byId.delete(id)
+      }
+    }
+    // Cards present server-side but not in the saved order (e.g. fresh round)
+    // tag onto the end in server order.
+    for (const c of raw) if (byId.has(c.id)) ordered.push(c)
+    return ordered
   })
   const atRoundLimit = computed(() => {
     if (!state.value || state.value.settings.roundLimit === null) return false
@@ -223,6 +246,27 @@ export const useGameStore = defineStore('game', () => {
   socket.on('invalidMove', ({ reason }: { reason: string }) => {
     errorReason.value = reason as Reason
   })
+  socket.on('chatMessage', (msg: ChatMessage) => {
+    // Cap history so a long-running game doesn't bloat the panel.
+    const next = chatMessages.value.concat(msg)
+    chatMessages.value = next.length > 200 ? next.slice(next.length - 200) : next
+  })
+  socket.on(
+    'roomClosed',
+    ({ reason }: { roomCode: string; reason: string }) => {
+      console.warn(`[bigtwo] room closed by server: ${reason}`)
+      closedReason.value = reason
+      clearStoredSession()
+      mySessionPlayerId.value = null
+      isOnlineRoom.value = false
+      state.value = null
+      selectedIds.value = new Set()
+      errorReason.value = null
+      chatMessages.value = []
+      readyPlayerIds.value = new Set()
+      handOrder.value = []
+    },
+  )
 
   function createRoomOnline(settings: RoomSettings, nickname: string): Promise<boolean> {
     return new Promise((resolve) => {
@@ -335,11 +379,19 @@ export const useGameStore = defineStore('game', () => {
     socket.emit('readyForNextRound', { roomCode: state.value.roomCode })
   }
 
+  function sendChat(text: string) {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    socket.emit('chatMessage', { text: trimmed })
+  }
+
   function endGame() {
     if (isOnlineRoom.value) leaveRoomOnline()
     state.value = null
     selectedIds.value = new Set()
     errorReason.value = null
+    chatMessages.value = []
+    handOrder.value = []
   }
 
   // --- Local UI state (selection, hand sort) -----------------------------
@@ -358,24 +410,16 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function reorderHand(newOrder: Card[]) {
-    // Hand order is a purely local display preference. Never sent to the server;
-    // the next gameUpdated may re-establish a server-side order, which the user
-    // can re-sort if desired.
-    if (!state.value || !humanId.value) return
-    state.value = {
-      ...state.value,
-      hands: { ...state.value.hands, [humanId.value]: newOrder },
-    }
+    // Hand order is a purely local display preference. Store the ids; the
+    // humanHand computed re-projects from state.hands on every gameUpdated.
+    handOrder.value = newOrder.map((c) => c.id)
   }
 
   function sortHandBy(by: 'rank' | 'suit' | 'smart') {
     if (!state.value || !humanId.value) return
-    const h = state.value.hands[humanId.value]
+    const h = state.value.hands[humanId.value] ?? []
     const sorted = by === 'rank' ? sortByRank(h) : by === 'suit' ? sortBySuit(h) : smartSort(h)
-    state.value = {
-      ...state.value,
-      hands: { ...state.value.hands, [humanId.value]: sorted },
-    }
+    handOrder.value = sorted.map((c) => c.id)
   }
 
   return {
@@ -383,6 +427,8 @@ export const useGameStore = defineStore('game', () => {
     selectedIds,
     errorReason,
     readyPlayerIds,
+    chatMessages,
+    closedReason,
     botThinkingId,
     mySessionPlayerId,
     isOnlineRoom,
@@ -405,5 +451,6 @@ export const useGameStore = defineStore('game', () => {
     playSelected,
     passTurn,
     nextRound,
+    sendChat,
   }
 })

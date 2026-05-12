@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import { useGameStore } from '@/stores/gameStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const router = useRouter()
 const game = useGameStore()
+const settings = useSettingsStore()
+const { nickname } = storeToRefs(settings)
 const showRules = ref(false)
 
-const nickname = ref('You')
 const playerCount = ref<3 | 4>(4)
 const fillWithBots = ref(true)
 const scoringMode = ref<'simple'>('simple')
@@ -52,13 +55,12 @@ async function start() {
     {
       playerCount: playerCount.value,
       fillWithBots: fillWithBots.value,
-      botDifficulty: 'basic',
       scoringMode: scoringMode.value,
       cardValue: cardValue.value,
       roundLimit: roundLimit.value,
       isPublic: isPublic.value,
     },
-    nickname.value,
+    nickname.value.trim() || 'You',
   )
   creating.value = false
   if (ok) {
@@ -84,9 +86,13 @@ async function start() {
             <input
               v-model="nickname"
               type="text"
+              maxlength="20"
+              placeholder="You"
               class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:border-brand-500 focus:ring-2 focus:ring-brand-100 outline-none"
             />
-            <p class="text-xs text-slate-500 mt-1">This is how other players see you.</p>
+            <p class="text-xs text-slate-500 mt-1">
+              This is how other players see you. Saved locally so you don't have to retype it.
+            </p>
           </div>
 
           <div>

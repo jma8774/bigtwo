@@ -34,7 +34,6 @@ export type RoomPublicState = {
   settings: {
     playerCount: 3 | 4
     fillWithBots: boolean
-    botDifficulty: 'basic'
     scoringMode: 'simple'
     cardValue: number
     roundLimit: number | null
@@ -56,4 +55,12 @@ export type PublicRoomSummary = {
   seatsAvailable: number
   inProgress: boolean
   createdAt: number
+}
+
+export type ChatMessage = {
+  id: string
+  playerId: string
+  nickname: string
+  text: string
+  at: number
 }

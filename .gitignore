@@ -32,3 +32,6 @@ dist-ssr/
 .env
 .env.local
 .env.*.local
+
+# Backend runtime logs
+backend/logs/

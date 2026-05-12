@@ -31,18 +31,26 @@ const opponents = computed(() => {
   if (!state.value || !humanId.value) return []
   return state.value.players
     .filter((p) => p.id !== humanId.value)
-    .map((p) => ({
-      name: p.nickname,
-      cardCount:
-        state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0,
-      score: state.value!.scores[p.id] ?? 0,
-      status:
+    .map((p) => {
+      const isTurn =
         state.value!.currentPlayerId === p.id && state.value!.status === 'playing'
-          ? ('turn' as const)
-          : undefined,
-      active: state.value!.currentPlayerId === p.id && state.value!.status === 'playing',
-      thinking: game.botThinkingId === p.id,
-    }))
+      const disconnected = !p.isBot && p.connected === false
+      return {
+        name: p.nickname,
+        cardCount:
+          state.value!.handCounts?.[p.id] ?? state.value!.hands[p.id]?.length ?? 0,
+        score: state.value!.scores[p.id] ?? 0,
+        // Disconnected takes priority over the turn badge — a stale "their turn"
+        // chip on a dropped opponent is confusing.
+        status: disconnected
+          ? ('disconnected' as const)
+          : isTurn
+            ? ('turn' as const)
+            : undefined,
+        active: isTurn && !disconnected,
+        thinking: game.botThinkingId === p.id,
+      }
+    })
 })
 
 const hand = computed(() => game.humanHand)
@@ -290,7 +298,13 @@ const opponentsGridClass = computed(() => {
       </div>
     </main>
 
-    <ChatPanel :logEntries="logEntries" :nickname="state?.players.find((p) => !p.isBot)?.nickname ?? 'You'" />
+    <ChatPanel
+      :logEntries="logEntries"
+      :messages="game.chatMessages"
+      :myPlayerId="humanId ?? ''"
+      :nickname="state?.players.find((p) => p.id === humanId)?.nickname ?? 'You'"
+      @send="(text: string) => game.sendChat(text)"
+    />
     <RulesModal :open="showRules" @close="showRules = false" />
     <RoundSummaryModal
       v-if="summary"

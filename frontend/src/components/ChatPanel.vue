@@ -10,7 +10,8 @@ type LogEntry = {
 
 type ChatMessage = {
   id: string
-  sender: string
+  playerId?: string
+  nickname: string
   text: string
   at: number
 }
@@ -18,21 +19,22 @@ type ChatMessage = {
 const props = withDefaults(
   defineProps<{
     logEntries: LogEntry[]
+    messages?: ChatMessage[]
     nickname?: string
+    myPlayerId?: string
   }>(),
-  { nickname: 'You' },
+  { nickname: 'You', myPlayerId: '', messages: () => [] },
 )
+
+const emit = defineEmits<{
+  send: [text: string]
+}>()
 
 const open = ref(false)
 const chipVisible = ref(true)
 const activeTab = ref<'log' | 'chat'>('log')
 const unread = ref(0)
 const draft = ref('')
-const messages = ref<ChatMessage[]>([
-  { id: 'm1', sender: 'Riley', text: 'gl hf!', at: Date.now() - 60_000 },
-  { id: 'm2', sender: 'Alex', text: 'who has 3♦?', at: Date.now() - 45_000 },
-  { id: 'm3', sender: 'You', text: 'me 😅', at: Date.now() - 30_000 },
-])
 
 const logScrollRef = useTemplateRef<HTMLDivElement>('logScrollRef')
 const chatScrollRef = useTemplateRef<HTMLDivElement>('chatScrollRef')
@@ -40,8 +42,22 @@ const chatScrollRef = useTemplateRef<HTMLDivElement>('chatScrollRef')
 watch(
   () => props.logEntries.length,
   () => {
-    // Log entries never bump unread — only chat messages do (wired in P2 / TICKET-007).
     if (open.value && activeTab.value === 'log') scrollLogToBottom()
+  },
+)
+
+watch(
+  () => props.messages.length,
+  (n, prev) => {
+    if (n <= (prev ?? 0)) return
+    const last = props.messages[n - 1]
+    const fromMe =
+      !!last && !!props.myPlayerId && last.playerId === props.myPlayerId
+    if (open.value && activeTab.value === 'chat') {
+      nextTick(scrollChatToBottom)
+    } else if (!fromMe) {
+      unread.value += 1
+    }
   },
 )
 
@@ -86,12 +102,7 @@ function onPanelAfterLeave() {
 function send() {
   const text = draft.value.trim()
   if (!text) return
-  messages.value.push({
-    id: `m-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    sender: props.nickname,
-    text,
-    at: Date.now(),
-  })
+  emit('send', text)
   draft.value = ''
   nextTick(scrollChatToBottom)
 }
@@ -213,15 +224,21 @@ const unreadLabel = computed(() => (unread.value > 9 ? '9+' : String(unread.valu
           <div
             v-for="m in messages"
             :key="m.id"
-            :class="['flex flex-col', m.sender === nickname ? 'items-end' : 'items-start']"
+            :class="[
+              'flex flex-col',
+              (myPlayerId && m.playerId === myPlayerId) || (!myPlayerId && m.nickname === nickname)
+                ? 'items-end'
+                : 'items-start',
+            ]"
           >
             <span class="text-xs text-slate-500 mb-0.5">
-              {{ m.sender }} · {{ formatTime(m.at) }}
+              {{ m.nickname }} · {{ formatTime(m.at) }}
             </span>
             <div
               :class="[
                 'max-w-[80%] rounded-2xl px-3 py-1.5 text-sm break-words',
-                m.sender === nickname
+                (myPlayerId && m.playerId === myPlayerId) ||
+                (!myPlayerId && m.nickname === nickname)
                   ? 'bg-brand-600 text-white rounded-br-md'
                   : 'bg-white border border-slate-200 text-slate-800 rounded-bl-md',
               ]"

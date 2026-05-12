@@ -1,12 +1,29 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
 import heroUrl from '@/assets/images/home-hero.png'
+import { useGameStore } from '@/stores/gameStore'
 
 const router = useRouter()
+const game = useGameStore()
 const showRules = ref(false)
+
+const closedNotice = computed(() => {
+  if (!game.closedReason) return null
+  if (game.closedReason === 'EXPIRED') return 'Your room was closed due to inactivity.'
+  return 'Your room was closed.'
+})
+
+onMounted(() => {
+  // One-shot notice — clear once HomePage has mounted so it doesn't re-fire.
+  if (game.closedReason) {
+    setTimeout(() => {
+      game.closedReason = null
+    }, 6000)
+  }
+})
 </script>
 
 <template>
@@ -23,6 +40,16 @@ const showRules = ref(false)
         </nav>
       </template>
     </AppTopBar>
+
+    <div
+      v-if="closedNotice"
+      class="max-w-3xl mx-auto px-8 pt-4 -mb-2"
+      role="status"
+    >
+      <div class="rounded-xl border border-amber-200 bg-amber-50 text-amber-800 px-4 py-2 text-sm text-center">
+        {{ closedNotice }}
+      </div>
+    </div>
 
     <main class="max-w-3xl mx-auto px-8 py-20 text-center">
       <h1 class="text-7xl font-bold text-slate-900 leading-tight mb-5">Big Two</h1>
