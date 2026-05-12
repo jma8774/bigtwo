@@ -51,7 +51,7 @@ async function start() {
   if (creating.value) return
   creating.value = true
   errorMessage.value = null
-  const ok = await game.createRoomOnline(
+  const result = await game.createRoomOnline(
     {
       playerCount: playerCount.value,
       fillWithBots: fillWithBots.value,
@@ -63,8 +63,13 @@ async function start() {
     nickname.value.trim() || 'You',
   )
   creating.value = false
-  if (ok) {
+  if (result.ok) {
     router.push({ name: 'lobby' })
+  } else if (result.error === 'ROOM_CAP_REACHED') {
+    errorMessage.value =
+      'Server is at capacity right now (15 rooms in use). Try again in a minute.'
+  } else if (result.error === 'BAD_SETTINGS') {
+    errorMessage.value = 'Those settings aren’t valid. Please refresh and retry.'
   } else {
     errorMessage.value = 'Could not reach the server. Check your connection and try again.'
   }

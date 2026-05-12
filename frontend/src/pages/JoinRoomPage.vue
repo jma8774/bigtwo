@@ -74,10 +74,14 @@ async function join() {
   if (!canJoin.value) return
   joining.value = true
   errorMessage.value = null
-  const ok = await game.joinRoomOnline(codeStr.value, nickname.value.trim() || 'Guest')
+  const result = await game.joinRoomOnline(codeStr.value, nickname.value.trim() || 'Guest')
   joining.value = false
-  if (ok) {
+  if (result.ok) {
     router.push({ name: 'lobby' })
+  } else if (result.error === 'GAME_ALREADY_STARTED') {
+    errorMessage.value = 'That game already started.'
+  } else if (result.error === 'ROOM_FULL') {
+    errorMessage.value = 'That room is full.'
   } else {
     errorMessage.value = 'Could not join that room. Check the code and try again.'
   }

@@ -31,9 +31,6 @@ onMounted(() => {
     <AppTopBar>
       <template #left>
         <nav class="flex items-center gap-6 text-sm">
-          <RouterLink to="/" class="text-slate-900 font-medium border-b-2 border-brand-600 pb-1"
-            >Home</RouterLink
-          >
           <RouterLink to="/browse" class="text-slate-500 hover:text-slate-900 transition-colors"
             >Rooms</RouterLink
           >

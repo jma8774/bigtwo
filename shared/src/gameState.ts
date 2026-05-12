@@ -82,7 +82,7 @@ export function createPileMeta(index: number): PlayedPileCardMeta {
   return {
     xRatio: Number(randomBetween(-1, 1).toFixed(3)),
     yRatio: Number(randomBetween(-1, 1).toFixed(3)),
-    rotation: Number(randomBetween(-14, 14).toFixed(1)),
+    rotation: Number(randomBetween(-30, 30).toFixed(1)),
     zIndex: index,
   }
 }

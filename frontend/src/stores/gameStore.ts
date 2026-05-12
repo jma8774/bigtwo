@@ -268,7 +268,12 @@ export const useGameStore = defineStore('game', () => {
     },
   )
 
-  function createRoomOnline(settings: RoomSettings, nickname: string): Promise<boolean> {
+  type RoomOpResult = { ok: true } | { ok: false; error: string }
+
+  function createRoomOnline(
+    settings: RoomSettings,
+    nickname: string,
+  ): Promise<RoomOpResult> {
     return new Promise((resolve) => {
       socket.emit('createRoom', { nickname, settings }, (ack: RoomAck) => {
         if (ack?.ok) {
@@ -279,16 +284,16 @@ export const useGameStore = defineStore('game', () => {
           })
           mySessionPlayerId.value = ack.playerId
           isOnlineRoom.value = true
-          resolve(true)
+          resolve({ ok: true })
         } else {
           console.warn('[bigtwo] createRoom failed:', ack?.error)
-          resolve(false)
+          resolve({ ok: false, error: ack?.error ?? 'UNKNOWN' })
         }
       })
     })
   }
 
-  function joinRoomOnline(roomCode: string, nickname: string): Promise<boolean> {
+  function joinRoomOnline(roomCode: string, nickname: string): Promise<RoomOpResult> {
     return new Promise((resolve) => {
       socket.emit('joinRoom', { roomCode, nickname }, (ack: RoomAck) => {
         if (ack?.ok) {
@@ -299,10 +304,10 @@ export const useGameStore = defineStore('game', () => {
           })
           mySessionPlayerId.value = ack.playerId
           isOnlineRoom.value = true
-          resolve(true)
+          resolve({ ok: true })
         } else {
           console.warn('[bigtwo] joinRoom failed:', ack?.error)
-          resolve(false)
+          resolve({ ok: false, error: ack?.error ?? 'UNKNOWN' })
         }
       })
     })

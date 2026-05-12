@@ -61,6 +61,12 @@ export type PublicRoomSummary = {
   createdAt: number
 }
 
+export type PublicRoomsChangedPayload = {
+  rooms: PublicRoomSummary[]
+  totalRooms: number
+  roomCap: number
+}
+
 export type ChatMessage = {
   id: string
   playerId: string

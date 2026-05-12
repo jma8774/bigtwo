@@ -4,7 +4,11 @@ import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppTopBar from '@/components/AppTopBar.vue'
 import RulesModal from '@/components/RulesModal.vue'
-import { getSocket, type PublicRoomSummary } from '@/utils/socket'
+import {
+  getSocket,
+  type PublicRoomSummary,
+  type PublicRoomsChangedPayload,
+} from '@/utils/socket'
 import { useGameStore } from '@/stores/gameStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 
@@ -15,24 +19,30 @@ const { nickname } = storeToRefs(settings)
 
 const showRules = ref(false)
 const rooms = ref<PublicRoomSummary[]>([])
+const totalRooms = ref(0)
+const roomCap = ref(15)
 const loading = ref(true)
 const joiningCode = ref<string | null>(null)
 const errorMessage = ref<string | null>(null)
 
 const socket = getSocket()
 
-function applyRooms(list: PublicRoomSummary[]) {
-  rooms.value = list
+function applyPayload(payload: PublicRoomsChangedPayload) {
+  rooms.value = payload.rooms
+  totalRooms.value = payload.totalRooms
+  roomCap.value = payload.roomCap
   loading.value = false
 }
 
-function onPublicRoomsChanged(list: PublicRoomSummary[]) {
-  applyRooms(list)
+function onPublicRoomsChanged(payload: PublicRoomsChangedPayload) {
+  applyPayload(payload)
 }
 
 function subscribe() {
   loading.value = true
-  socket.emit('subscribePublicRooms', null, (list: PublicRoomSummary[]) => applyRooms(list))
+  socket.emit('subscribePublicRooms', null, (payload: PublicRoomsChangedPayload) =>
+    applyPayload(payload),
+  )
   socket.on('publicRoomsChanged', onPublicRoomsChanged)
 }
 
@@ -53,18 +63,33 @@ onBeforeUnmount(unsubscribe)
 
 function refresh() {
   loading.value = true
-  socket.emit('subscribePublicRooms', null, (list: PublicRoomSummary[]) => applyRooms(list))
+  socket.emit('subscribePublicRooms', null, (payload: PublicRoomsChangedPayload) =>
+    applyPayload(payload),
+  )
 }
+
+const capLabel = computed(() => `${totalRooms.value} / ${roomCap.value}`)
+const capColor = computed(() =>
+  totalRooms.value >= roomCap.value
+    ? 'text-rose-600'
+    : totalRooms.value >= roomCap.value - 3
+      ? 'text-amber-600'
+      : 'text-slate-500',
+)
 
 async function joinRoom(code: string) {
   if (joiningCode.value) return
   joiningCode.value = code
   errorMessage.value = null
   const trimmed = nickname.value.trim() || 'Guest'
-  const ok = await game.joinRoomOnline(code, trimmed)
+  const result = await game.joinRoomOnline(code, trimmed)
   joiningCode.value = null
-  if (ok) {
+  if (result.ok) {
     router.push({ name: 'lobby' })
+  } else if (result.error === 'GAME_ALREADY_STARTED') {
+    errorMessage.value = `${code} already started — pick another.`
+  } else if (result.error === 'ROOM_FULL') {
+    errorMessage.value = `${code} is full — pick another.`
   } else {
     errorMessage.value = `Couldn't join ${code}. It may have started or filled up.`
   }
@@ -89,7 +114,19 @@ const hasRooms = computed(() => rooms.value.length > 0)
     <main class="max-w-4xl mx-auto px-6 py-10">
       <header class="flex items-end justify-between mb-6 gap-4 flex-wrap">
         <div>
-          <h1 class="text-3xl font-bold text-slate-900">Public Rooms</h1>
+          <div class="flex items-center gap-3 flex-wrap">
+            <h1 class="text-3xl font-bold text-slate-900">Public Rooms</h1>
+            <span
+              :class="[
+                'inline-flex items-center gap-1 text-xs font-semibold tabular-nums rounded-full bg-slate-100 px-2.5 py-1',
+                capColor,
+              ]"
+              :title="`${totalRooms} of ${roomCap} server-wide room slots used`"
+            >
+              <span class="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+              {{ capLabel }}
+            </span>
+          </div>
           <p class="text-sm text-slate-500 mt-1">
             Jump into an open table, or create your own.
           </p>

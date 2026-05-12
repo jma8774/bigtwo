@@ -54,6 +54,15 @@ export type RoomPublicState = {
 
 const rooms = new Map<string, Room>()
 
+/** Global cap on concurrent rooms (across both public and private). The
+ *  in-memory store is single-process and small; this prevents a hostile
+ *  client from OOMing the server with createRoom spam. */
+export const ROOM_CAP = 15
+
+/** Server-side nickname cap. Mirrors the frontend's input maxlength so
+ *  someone bypassing the UI can't push huge strings into broadcast traffic. */
+export const NICKNAME_MAX = 20
+
 // Excludes 0/1/I/O to avoid ambiguous codes in human handoff.
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
 
@@ -74,10 +83,19 @@ function newPlayerId(): string {
   return `p_${randomBytes(6).toString('hex')}`
 }
 
+/** Strip control chars and clamp to NICKNAME_MAX. Falls back to 'Player'
+ *  for empty/whitespace-only inputs. Mirrors the frontend's maxlength=20. */
+function sanitizeNickname(input: unknown): string {
+  if (typeof input !== 'string') return 'Player'
+  // eslint-disable-next-line no-control-regex
+  const cleaned = input.replace(/[\x00-\x1F\x7F]/g, '').trim().slice(0, NICKNAME_MAX)
+  return cleaned || 'Player'
+}
+
 function makePlayer(nickname: string): RoomPlayer {
   return {
     id: newPlayerId(),
-    nickname: (nickname ?? '').trim() || 'Player',
+    nickname: sanitizeNickname(nickname),
     isBot: false,
     connected: true,
     socketId: null,
@@ -85,10 +103,43 @@ function makePlayer(nickname: string): RoomPlayer {
   }
 }
 
+/** Schema-check RoomSettings before we trust it. The client UI already
+ *  constrains these, but the server cannot trust the UI. Returns null on
+ *  success, an error code string on failure. */
+export function validateRoomSettings(s: unknown): string | null {
+  if (!s || typeof s !== 'object') return 'BAD_SETTINGS'
+  const o = s as Record<string, unknown>
+  if (o.playerCount !== 3 && o.playerCount !== 4) return 'BAD_SETTINGS'
+  if (typeof o.fillWithBots !== 'boolean') return 'BAD_SETTINGS'
+  if (o.scoringMode !== 'simple') return 'BAD_SETTINGS'
+  if (
+    typeof o.cardValue !== 'number' ||
+    !Number.isInteger(o.cardValue) ||
+    o.cardValue < 1 ||
+    o.cardValue > 100
+  ) {
+    return 'BAD_SETTINGS'
+  }
+  if (
+    o.roundLimit !== null &&
+    (typeof o.roundLimit !== 'number' ||
+      !Number.isInteger(o.roundLimit) ||
+      o.roundLimit < 1 ||
+      o.roundLimit > 50)
+  ) {
+    return 'BAD_SETTINGS'
+  }
+  if (typeof o.isPublic !== 'boolean') return 'BAD_SETTINGS'
+  return null
+}
+
 export function createRoom(
   nickname: string,
   settings: RoomSettings,
-): { room: Room; player: RoomPlayer } {
+): { room: Room; player: RoomPlayer } | { error: string } {
+  if (rooms.size >= ROOM_CAP) return { error: 'ROOM_CAP_REACHED' }
+  const settingsError = validateRoomSettings(settings)
+  if (settingsError) return { error: settingsError }
   const player = makePlayer(nickname)
   const room: Room = {
     code: newCode(),
@@ -110,6 +161,9 @@ export function joinRoom(
   code: string,
   nickname: string,
 ): { room: Room; player: RoomPlayer } | { error: string } {
+  if (typeof code !== 'string' || !/^[A-Z2-9]{4}$/.test(code)) {
+    return { error: 'ROOM_NOT_FOUND' }
+  }
   const room = rooms.get(code)
   if (!room) return { error: 'ROOM_NOT_FOUND' }
   if (room.gameState && room.gameState.status !== 'waiting') {
@@ -119,6 +173,10 @@ export function joinRoom(
   const player = makePlayer(nickname)
   room.players.push(player)
   return { room, player }
+}
+
+export function getRoomCounts(): { total: number; cap: number } {
+  return { total: rooms.size, cap: ROOM_CAP }
 }
 
 export function rejoinRoom(

@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io'
 import {
   createRoom,
   getRoom,
+  getRoomCounts,
   joinRoom,
   rejoinRoom,
   leaveRoom,
@@ -25,18 +26,47 @@ import { log } from './logger.js'
 
 const PUBLIC_LOBBY_CHANNEL = 'public-lobby-list'
 
+export type PublicRoomsChangedPayload = {
+  rooms: PublicRoomSummary[]
+  totalRooms: number
+  roomCap: number
+}
+
+function buildPublicRoomsPayload(): PublicRoomsChangedPayload {
+  const { total, cap } = getRoomCounts()
+  return { rooms: listPublicRooms(), totalRooms: total, roomCap: cap }
+}
+
 function emitPublicRoomsChanged(io: Server): void {
-  io.to(PUBLIC_LOBBY_CHANNEL).emit('publicRoomsChanged', listPublicRooms())
+  io.to(PUBLIC_LOBBY_CHANNEL).emit('publicRoomsChanged', buildPublicRoomsPayload())
 }
 
 type SocketData = {
   roomCode?: string
   playerId?: string
   lastChatAt?: number
+  /** Sliding-window timestamps (epoch ms) of recent gameplay emits. Used
+   *  by withRateLimit() to enforce 10 msg/sec for play/pass/ready/start. */
+  gameplayActionLog?: number[]
 }
 
 const CHAT_MAX_LENGTH = 200
 const CHAT_MIN_INTERVAL_MS = 200
+const GAMEPLAY_WINDOW_MS = 1000
+const GAMEPLAY_MAX_PER_WINDOW = 10
+
+/** Drop emits beyond GAMEPLAY_MAX_PER_WINDOW per GAMEPLAY_WINDOW_MS per
+ *  socket. Returns true when the event is allowed to proceed. */
+function checkGameplayRateLimit(socket: Socket): boolean {
+  const data = socket.data as SocketData
+  const now = Date.now()
+  const log = (data.gameplayActionLog ??= [])
+  const cutoff = now - GAMEPLAY_WINDOW_MS
+  while (log.length > 0 && log[0] < cutoff) log.shift()
+  if (log.length >= GAMEPLAY_MAX_PER_WINDOW) return false
+  log.push(now)
+  return true
+}
 
 type CreateAck =
   | { ok: true; roomCode: string; playerId: string; seatToken: string }
@@ -75,7 +105,13 @@ export function registerHandlers(io: Server): void {
         ack?: (response: CreateAck) => void,
       ) => {
         try {
-          const { room, player } = createRoom(payload.nickname, payload.settings)
+          const result = createRoom(payload?.nickname, payload?.settings)
+          if ('error' in result) {
+            log.warn(`[room] createRoom refused reason=${result.error}`)
+            ack?.({ ok: false, error: result.error })
+            return
+          }
+          const { room, player } = result
           player.socketId = socket.id
           setSocketSeat(socket, room.code, player.id)
           ack?.({
@@ -186,6 +222,10 @@ export function registerHandlers(io: Server): void {
           ack?.({ ok: false, error: 'NOT_IN_ROOM' })
           return
         }
+        if (!checkGameplayRateLimit(socket)) {
+          ack?.({ ok: false, error: 'RATE_LIMITED' })
+          return
+        }
         const result = startGameForRoom(io, data.roomCode, data.playerId)
         if (!result.ok) {
           log.warn(
@@ -208,6 +248,10 @@ export function registerHandlers(io: Server): void {
           ack?.({ ok: false, error: 'NOT_IN_ROOM' })
           return
         }
+        if (!checkGameplayRateLimit(socket)) {
+          ack?.({ ok: false, error: 'RATE_LIMITED' })
+          return
+        }
         const result = playCardsForPlayer(
           io,
           data.roomCode,
@@ -227,6 +271,10 @@ export function registerHandlers(io: Server): void {
           ack?.({ ok: false, error: 'NOT_IN_ROOM' })
           return
         }
+        if (!checkGameplayRateLimit(socket)) {
+          ack?.({ ok: false, error: 'RATE_LIMITED' })
+          return
+        }
         const result = passTurnForPlayer(io, data.roomCode, data.playerId)
         if (!result.ok) socket.emit('invalidMove', { reason: result.error })
         ack?.(result)
@@ -241,6 +289,10 @@ export function registerHandlers(io: Server): void {
           ack?.({ ok: false, error: 'NOT_IN_ROOM' })
           return
         }
+        if (!checkGameplayRateLimit(socket)) {
+          ack?.({ ok: false, error: 'RATE_LIMITED' })
+          return
+        }
         const result = readyForNextRound(io, data.roomCode, data.playerId)
         ack?.(result)
       },
@@ -248,9 +300,9 @@ export function registerHandlers(io: Server): void {
 
     socket.on(
       'subscribePublicRooms',
-      (_payload, ack?: (rooms: PublicRoomSummary[]) => void) => {
+      (_payload, ack?: (payload: PublicRoomsChangedPayload) => void) => {
         void socket.join(PUBLIC_LOBBY_CHANNEL)
-        ack?.(listPublicRooms())
+        ack?.(buildPublicRoomsPayload())
       },
     )
 
