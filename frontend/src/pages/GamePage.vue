@@ -266,12 +266,21 @@ const opponentsGridClass = computed(() => {
         ]"
       >
         <div class="flex items-center justify-between gap-3">
-          <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Your hand
-            <span class="ml-1 text-sm font-normal normal-case tracking-normal text-slate-500"
-              >({{ hand.length }} cards)</span
+          <div class="flex items-center gap-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Your hand
+              <span class="ml-1 text-sm font-normal normal-case tracking-normal text-slate-500"
+                >({{ hand.length }} cards)</span
+              >
+            </span>
+            <span
+              v-if="isHumanTurn"
+              class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-brand-50 border border-brand-200 text-brand-700 text-xs font-semibold whitespace-nowrap"
             >
-          </span>
+              <span class="w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
+              Your turn
+            </span>
+          </div>
           <div class="flex items-center gap-3">
             <p v-if="selectedSet.size > 0" class="text-sm font-medium text-brand-700">
               {{ selectedSet.size }} selected
